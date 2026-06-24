@@ -2079,48 +2079,13 @@ footer.site-footer {
   font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: auto;
 }
 .pool-bar-sm { height: 22px; }
-/* Profile tags (role / class / trait) */
-.pool-tags {
-  display: flex; flex-wrap: wrap; gap: 5px;
-  margin-top: 6px; margin-bottom: 2px;
-}
-.pool-tag {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.2px;
-  font-weight: 600; padding: 2px 7px; border-radius: 3px;
-  text-transform: uppercase; white-space: nowrap;
-}
-.pool-tag.tag-role { background: var(--surface-2); color: var(--text); }
-.pool-tag.tag-class { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
-.pool-tag.tag-gender { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--border); }
-.pool-tag.tag-trait { background: var(--ink); color: var(--text-inverse); }
-/* Role distribution bar */
-.role-dist {
-  display: flex; align-items: center; gap: 6px;
-  margin-top: 4px; margin-bottom: 2px;
-}
-.role-dist-label {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px;
-  color: var(--muted-light); text-transform: uppercase; flex-shrink: 0;
-}
-.role-dist-bar {
-  display: flex; height: 6px; flex: 1; border-radius: 3px; overflow: hidden;
-  background: var(--surface);
-}
-.role-dist-seg {
-  height: 100%; min-width: 0; position: relative; cursor: default;
-}
-.role-dist-seg[data-tooltip]:hover::after {
-  content: attr(data-tooltip); position: absolute; bottom: calc(100% + 6px);
-  left: 50%; transform: translateX(-50%); background: var(--surface-dark);
-  color: var(--text-inverse); font-size: 9px; padding: 3px 8px; white-space: nowrap;
-  z-index: 30; border-radius: 3px; font-family: var(--font-mono);
-  pointer-events: none;
-}
-.role-dist-seg.role-top { background: #5a534a; }
-.role-dist-seg.role-jgl { background: #3f6b3f; }
-.role-dist-seg.role-mid { background: #6b5a3f; }
-.role-dist-seg.role-bot { background: #3f5a6b; }
-.role-dist-seg.role-sup { background: #6b3f5a; }
+/* Profile badge in SR theater header — sits before the pool classification badge */
+.badge-profile { margin-left: auto !important; }
+.badge-profile + .pool-theater-badge { margin-left: 5px; }
+.badge-profile.tag-role { background: var(--blue-mid); color: #fff; }
+.badge-profile.tag-class { background: var(--amber-mid); color: #fff; }
+.badge-profile.tag-gender { background: #0891b2; color: #fff; }
+.badge-profile.tag-trait { background: #7c3aed; color: #fff; }
 
 /* ── Sync button ── */
 .sync-btn {

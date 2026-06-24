@@ -91,7 +91,7 @@ export const MOCK_STATS = {
       profile_tags: [
         { label: 'PRECISION DOCTRINE', category: 'class', strength: 0.96 },
         { label: 'BOT SPECIALIST', category: 'role', strength: 0.94 },
-        { label: 'ARTILLERY BATTERY', category: 'trait', strength: 0.63 },
+        { label: 'LONG-RANGE BIAS', category: 'trait', strength: 0.63 },
       ],
       primary_role: 'BOTTOM',
       primary_class: 'Marksman',
@@ -153,7 +153,7 @@ export const MOCK_STATS = {
       class_distribution: { Assassin: 20, Mage: 10, Fighter: 5, Tank: 4, Marksman: 4 },
       profile_tags: [
         { label: 'MID / JGL FLEX', category: 'role', strength: 0.74 },
-        { label: 'SHADOW OPERATIVE', category: 'trait', strength: 0.46 },
+        { label: 'STEALTH BIAS', category: 'trait', strength: 0.46 },
       ],
       primary_role: 'MIDDLE',
       primary_class: 'Assassin',
@@ -185,7 +185,7 @@ export const MOCK_STATS = {
       profile_tags: [
         { label: 'BOT SPECIALIST', category: 'role', strength: 0.90 },
         { label: 'PRECISION DOCTRINE', category: 'class', strength: 0.90 },
-        { label: 'HIGH MOBILITY ASSET', category: 'trait', strength: 0.60 },
+        { label: 'HIGH MOBILITY BIAS', category: 'trait', strength: 0.60 },
       ],
       primary_role: 'BOTTOM',
       primary_class: 'Marksman',

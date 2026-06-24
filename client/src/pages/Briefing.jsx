@@ -901,6 +901,17 @@ export default function Briefing() {
                   const primaryRoleLabel = op.primary_role ? ROLE_DISPLAY[op.primary_role] || op.primary_role : null
                   const primaryClassLabel = op.primary_class || null
 
+                  // Pick the most distinctive profile tag for the SR theater badge
+                  // Rotate priority by operator so badges vary across the cell
+                  const tagPriorities = [
+                    ['trait', 'gender', 'class', 'role'],
+                    ['class', 'trait', 'gender', 'role'],
+                    ['gender', 'trait', 'class', 'role'],
+                  ]
+                  const priority = tagPriorities[opSeed % tagPriorities.length]
+                  const srProfileTag = priority.reduce((found, cat) => found || profileTags.find(t => t.category === cat), null)
+                  const badgeCat = srProfileTag?.category
+
                   const strongTemplates = [
                     () => `${allChamps.length} champion${allChamps.length !== 1 ? 's' : ''} on file across ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}.`,
                     () => bestChamp ? `Primary asset: ${bestChamp.name}. ${allChamps.length} unique selections recorded.` : `${allChamps.length} selections on file.`,
@@ -936,10 +947,12 @@ export default function Briefing() {
                       return `Strongest theater: ${bestTheater} (${btWr}% WR). ${bestChamp ? `${bestChamp.name} remains the primary selection across environments.` : 'No dominant pick identified.'}`
                     },
                     () => {
-                      const traitTag = profileTags.find(t => t.category === 'trait')
+                      const traitTag = badgeCat !== 'trait' && profileTags.find(t => t.category === 'trait')
                       if (traitTag) return `Behavioral pattern detected: ${traitTag.label}. Champion selection correlates with identifiable operational archetype. Monitoring classification applied.`
-                      const genderTag = profileTags.find(t => t.category === 'gender')
+                      const genderTag = badgeCat !== 'gender' && profileTags.find(t => t.category === 'gender')
                       if (genderTag) return `Note: ${genderTag.label} across all ${totalGames} deployments. Selection bias documented.`
+                      const classTag = badgeCat !== 'class' && profileTags.find(t => t.category === 'class')
+                      if (classTag) return `Archetype classification: ${classTag.label}. Operational doctrine consistent across reviewed deployments.`
                       return 'No significant behavioral pattern identified. Selection methodology appears standard.'
                     },
                   ]
@@ -951,6 +964,22 @@ export default function Briefing() {
                     ? 'Profile pending additional deployments.'
                     : textTemplates[(opSeed + 2) % textTemplates.length]()
 
+                  // Build a second note line from profile data — skip the badge's category to avoid repetition
+                  const noteProfile = (() => {
+                    if (totalGames < 5) return null
+                    const traitTag = badgeCat !== 'trait' && profileTags.find(t => t.category === 'trait')
+                    const genderTag = badgeCat !== 'gender' && profileTags.find(t => t.category === 'gender')
+                    const classTag = badgeCat !== 'class' && profileTags.find(t => t.category === 'class')
+                    const roleTag = badgeCat !== 'role' && profileTags.find(t => t.category === 'role')
+                    if (traitTag && genderTag) return `Operator profile flags: ${traitTag.label}, ${genderTag.label}. Selection pattern consistent across surveyed deployments.`
+                    if (traitTag) return `Behavioral marker: ${traitTag.label}. Champion selections correlate with identifiable operational archetype.`
+                    if (genderTag) return `${genderTag.label} across all ${totalGames} surveyed deployments. Selection bias documented.`
+                    if (roleTag && classTag) return `Lane doctrine: ${roleTag.label}. Archetype: ${classTag.label}. Profile classification: STABLE.`
+                    if (roleTag) return `Lane assignment profile: ${roleTag.label}. Cross-role deployment data insufficient for secondary classification.`
+                    if (classTag) return `Archetype classification: ${classTag.label}. Deployment consistency within expected parameters.`
+                    return null
+                  })()
+
                   return (
                     <div key={op.puuid} className="pool-row">
                       <div className="pool-header">
@@ -959,54 +988,32 @@ export default function Briefing() {
                           {isYou && <span className="cm-you-tag">YOU</span>}
                         </span>
                       </div>
-                      {profileTags.length > 0 && totalGames >= 5 && (
-                        <div className="pool-tags">
-                          {profileTags.map((tag, i) => (
-                            <span key={i} className={`pool-tag tag-${tag.category}`}>{tag.label}</span>
-                          ))}
-                        </div>
-                      )}
                       {THEATERS.map(theater => {
                         const td = op.theaters?.[theater] || { games: 0, top_champions: [], unique_champions: 0 }
                         const tGames = td.games || 0
                         const tChamps = td.top_champions || []
                         const { label: tLabel, badgeClass: tBadge } = classifyPool(tChamps, tGames)
-                        const showRoles = theater === "SUMMONER'S RIFT" && roleTotal >= 3
+                        const showProfileBadge = theater === "SUMMONER'S RIFT" && srProfileTag && tGames >= 5
                         return (
                           <div key={theater} className="pool-theater">
                             <div className="pool-theater-header">
                               <span className="pool-theater-label">{theater}</span>
                               <span className="pool-theater-games">{tGames} OPS</span>
+                              {showProfileBadge && (
+                                <span className={`pool-theater-badge badge badge-profile tag-${srProfileTag.category}`}>{srProfileTag.label}</span>
+                              )}
                               <span className={`pool-theater-badge badge ${tBadge}`}>{tLabel}</span>
                             </div>
                             <div className="pool-bar pool-bar-sm">
                               {renderPoolBar(tChamps, tGames, td.unique_champions)}
                             </div>
-                            {showRoles && (
-                              <div className="role-dist">
-                                <span className="role-dist-label">ROLE</span>
-                                <div className="role-dist-bar">
-                                  {Object.entries(roleDist)
-                                    .filter(([, n]) => n > 0)
-                                    .sort((a, b) => b[1] - a[1])
-                                    .map(([role, count]) => {
-                                      const pct = Math.round((count / roleTotal) * 100)
-                                      return (
-                                        <div key={role} className={`role-dist-seg ${ROLE_COLORS[role] || ''}`}
-                                          style={{ width: `${pct}%` }}
-                                          data-tooltip={`${ROLE_DISPLAY[role] || role}: ${pct}% (${count} ops)`}
-                                        />
-                                      )
-                                    })}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )
                       })}
                       <div className="pool-note">
                         <strong>{noteStrong}</strong>
                         {noteText}
+                        {noteProfile && !profileTags.some(t => noteText.includes(t.label)) && <><br/>{noteProfile}</>}
                       </div>
                     </div>
                   )

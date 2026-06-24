@@ -180,22 +180,22 @@ const CHAMPIONS = {
 
 // Trait -> intelligence-dossier label + minimum threshold (fraction of games)
 const TRAIT_TAGS = {
-  stealth:  { label: 'SHADOW OPERATIVE',         threshold: 0.40 },
-  dot:      { label: 'CHEMICAL WARFARE DIVISION', threshold: 0.40 },
-  hook:     { label: 'EXTRACTION UNIT',           threshold: 0.40 },
-  global:   { label: 'ORBITAL STRIKE CLEARANCE',  threshold: 0.35 },
-  yordle:   { label: 'YORDLE SYMPATHIZER',        threshold: 0.40 },
-  void:     { label: 'VOID CLEARANCE: GRANTED',   threshold: 0.35 },
-  edgy:     { label: 'EDGE DIVISION',             threshold: 0.40 },
-  monster:  { label: 'CREATURE UNIT',             threshold: 0.40 },
-  dash:     { label: 'HIGH MOBILITY ASSET',       threshold: 0.55 },
-  poke:     { label: 'ARTILLERY BATTERY',         threshold: 0.40 },
-  heal:     { label: 'MEDICAL DIVISION',          threshold: 0.40 },
-  shield:   { label: 'PROTECTIVE DETAIL',         threshold: 0.40 },
-  cc:       { label: 'CROWD SUPPRESSION UNIT',    threshold: 0.50 },
-  aoe:      { label: 'AREA DENIAL SPECIALIST',    threshold: 0.40 },
-  pet:      { label: 'HANDLER — AUXILIARY ASSETS', threshold: 0.35 },
-  drain:    { label: 'ATTRITION WARFARE DIVISION', threshold: 0.40 },
+  stealth:  { label: 'STEALTH BIAS',        threshold: 0.40 },
+  dot:      { label: 'DOT BIAS',            threshold: 0.40 },
+  hook:     { label: 'HOOK BIAS',           threshold: 0.40 },
+  global:   { label: 'GLOBAL ULT BIAS',     threshold: 0.35 },
+  yordle:   { label: 'YORDLE BIAS',         threshold: 0.40 },
+  void:     { label: 'VOID CHAMP BIAS',     threshold: 0.35 },
+  edgy:     { label: 'EDGELORD BIAS',       threshold: 0.40 },
+  monster:  { label: 'NON-HUMAN BIAS',      threshold: 0.40 },
+  dash:     { label: 'HIGH MOBILITY BIAS',  threshold: 0.55 },
+  poke:     { label: 'LONG-RANGE BIAS',     threshold: 0.40 },
+  heal:     { label: 'HEALER BIAS',         threshold: 0.40 },
+  shield:   { label: 'SHIELD BIAS',         threshold: 0.40 },
+  cc:       { label: 'CROWD CONTROL BIAS',  threshold: 0.50 },
+  aoe:      { label: 'AOE BIAS',            threshold: 0.40 },
+  pet:      { label: 'PET/SUMMON BIAS',     threshold: 0.35 },
+  drain:    { label: 'DRAIN TANK BIAS',     threshold: 0.40 },
 }
 
 // Gender pattern labels
