@@ -891,12 +891,23 @@ export default function Briefing() {
                   const bestWrChamp = allChamps.filter(c => c.games >= 3).sort((a, b) => b.win_rate - a.win_rate)[0]
                   const opSeed = (op.name || '').split('').reduce((s, c) => s * 31 + c.charCodeAt(0), 0) >>> 0
 
+                  const profileTags = op.profile_tags || []
+                  const roleDist = op.role_distribution || {}
+                  const roleTotal = Object.values(roleDist).reduce((a, b) => a + b, 0)
+
+                  const ROLE_DISPLAY = { TOP: 'TOP', JUNGLE: 'JGL', MIDDLE: 'MID', BOTTOM: 'BOT', UTILITY: 'SUP' }
+                  const ROLE_COLORS = { TOP: 'role-top', JUNGLE: 'role-jgl', MIDDLE: 'role-mid', BOTTOM: 'role-bot', UTILITY: 'role-sup' }
+
+                  const primaryRoleLabel = op.primary_role ? ROLE_DISPLAY[op.primary_role] || op.primary_role : null
+                  const primaryClassLabel = op.primary_class || null
+
                   const strongTemplates = [
                     () => `${allChamps.length} champion${allChamps.length !== 1 ? 's' : ''} on file across ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}.`,
                     () => bestChamp ? `Primary asset: ${bestChamp.name}. ${allChamps.length} unique selections recorded.` : `${allChamps.length} selections on file.`,
                     () => `${totalGames} joint deployments surveyed. ${allChamps.length} distinct champion selections catalogued.`,
                     () => bestChamp ? `${bestChamp.name} leads deployment frequency. ${allChamps.length - 1} alternate${allChamps.length > 2 ? 's' : ''} on record.` : 'No dominant selection pattern identified.',
-                    () => activeTheaters.length >= 2 ? `Selection data spans ${activeTheaters.length} theaters. ${allChamps.length} champions indexed.` : `All ${totalGames} deployments confined to ${activeTheaters[0] || 'a single theater'}.`,
+                    () => primaryRoleLabel && roleTotal >= 3 ? `Primary lane assignment: ${primaryRoleLabel}. ${allChamps.length} champions indexed across ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}.` : `Selection data spans ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}. ${allChamps.length} champions indexed.`,
+                    () => primaryClassLabel ? `Dominant archetype: ${primaryClassLabel.toUpperCase()}. ${allChamps.length} selections catalogued.` : `${allChamps.length} selections on file. No dominant archetype identified.`,
                   ]
 
                   const textTemplates = [
@@ -924,6 +935,13 @@ export default function Briefing() {
                       const btWr = Math.round((op.theaters[bestTheater]?.win_rate ?? 0) * 100)
                       return `Strongest theater: ${bestTheater} (${btWr}% WR). ${bestChamp ? `${bestChamp.name} remains the primary selection across environments.` : 'No dominant pick identified.'}`
                     },
+                    () => {
+                      const traitTag = profileTags.find(t => t.category === 'trait')
+                      if (traitTag) return `Behavioral pattern detected: ${traitTag.label}. Champion selection correlates with identifiable operational archetype. Monitoring classification applied.`
+                      const genderTag = profileTags.find(t => t.category === 'gender')
+                      if (genderTag) return `Note: ${genderTag.label} across all ${totalGames} deployments. Selection bias documented.`
+                      return 'No significant behavioral pattern identified. Selection methodology appears standard.'
+                    },
                   ]
 
                   const noteStrong = totalGames < 5
@@ -941,11 +959,19 @@ export default function Briefing() {
                           {isYou && <span className="cm-you-tag">YOU</span>}
                         </span>
                       </div>
+                      {profileTags.length > 0 && totalGames >= 5 && (
+                        <div className="pool-tags">
+                          {profileTags.map((tag, i) => (
+                            <span key={i} className={`pool-tag tag-${tag.category}`}>{tag.label}</span>
+                          ))}
+                        </div>
+                      )}
                       {THEATERS.map(theater => {
                         const td = op.theaters?.[theater] || { games: 0, top_champions: [], unique_champions: 0 }
                         const tGames = td.games || 0
                         const tChamps = td.top_champions || []
                         const { label: tLabel, badgeClass: tBadge } = classifyPool(tChamps, tGames)
+                        const showRoles = theater === "SUMMONER'S RIFT" && roleTotal >= 3
                         return (
                           <div key={theater} className="pool-theater">
                             <div className="pool-theater-header">
@@ -956,6 +982,25 @@ export default function Briefing() {
                             <div className="pool-bar pool-bar-sm">
                               {renderPoolBar(tChamps, tGames, td.unique_champions)}
                             </div>
+                            {showRoles && (
+                              <div className="role-dist">
+                                <span className="role-dist-label">ROLE</span>
+                                <div className="role-dist-bar">
+                                  {Object.entries(roleDist)
+                                    .filter(([, n]) => n > 0)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([role, count]) => {
+                                      const pct = Math.round((count / roleTotal) * 100)
+                                      return (
+                                        <div key={role} className={`role-dist-seg ${ROLE_COLORS[role] || ''}`}
+                                          style={{ width: `${pct}%` }}
+                                          data-tooltip={`${ROLE_DISPLAY[role] || role}: ${pct}% (${count} ops)`}
+                                        />
+                                      )
+                                    })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )
                       })}

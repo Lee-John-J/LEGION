@@ -3,6 +3,8 @@
  * All calculations focus on games where 2+ CELL members participated together.
  */
 
+const { analyzeProfile } = require('../data/champions')
+
 // Resolve a human-readable mode name from queueId + gameMode fallback
 function resolveModeName(match) {
   const queueId = match.info?.queueId
@@ -182,6 +184,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
           wins: 0,
           champions: new Map(),
           theaterData: new Map(),
+          roleCounts: { TOP: 0, JUNGLE: 0, MIDDLE: 0, BOTTOM: 0, UTILITY: 0 },
           lastPlayed: 0,
         })
       }
@@ -206,6 +209,11 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const tc = td.champions.get(champ)
       tc.games++
       if (teamWon) tc.wins++
+      // Track assigned role (SR games only — teamPosition is empty for ARAM/Arena)
+      const pos = p.teamPosition
+      if (pos && theater === "SUMMONER'S RIFT" && op.roleCounts[pos] !== undefined) {
+        op.roleCounts[pos]++
+      }
     }
   }
 
@@ -249,6 +257,10 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
 
     // Resolve user_id from roster by PUUID
     const rosterEntry = memberRoster.find((m) => m.puuid === op.puuid)
+
+    // Champion profile analysis: roles, classes, traits
+    const profile = analyzeProfile(op.champions, op.roleCounts, op.games)
+
     return {
       puuid: op.puuid,
       user_id: rosterEntry?.id ?? null,
@@ -261,6 +273,11 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       unique_champions: op.champions.size,
       theaters,
       last_played: op.lastPlayed || null,
+      role_distribution: profile.role_distribution,
+      class_distribution: profile.class_distribution,
+      profile_tags: profile.profile_tags,
+      primary_role: profile.primary_role,
+      primary_class: profile.primary_class,
     }
   }).sort((a, b) => b.win_rate - a.win_rate || b.games - a.games)
 
@@ -284,6 +301,11 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       unique_champions: 0,
       theaters: emptyTheaters,
       last_played: null,
+      role_distribution: { TOP: 0, JUNGLE: 0, MIDDLE: 0, BOTTOM: 0, UTILITY: 0 },
+      class_distribution: {},
+      profile_tags: [],
+      primary_role: null,
+      primary_class: null,
     })
   }
 

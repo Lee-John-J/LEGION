@@ -86,6 +86,15 @@ export const MOCK_STATS = {
         ]),
       },
       last_played: Date.now() - 86400000,
+      role_distribution: { TOP: 0, JUNGLE: 0, MIDDLE: 0, BOTTOM: 45, UTILITY: 3 },
+      class_distribution: { Marksman: 46, Mage: 2 },
+      profile_tags: [
+        { label: 'PRECISION DOCTRINE', category: 'class', strength: 0.96 },
+        { label: 'BOT SPECIALIST', category: 'role', strength: 0.94 },
+        { label: 'ARTILLERY BATTERY', category: 'trait', strength: 0.63 },
+      ],
+      primary_role: 'BOTTOM',
+      primary_class: 'Marksman',
     },
     {
       puuid: PU.pin, user_id: 'mock-user-4', name: 'Pin Pon',
@@ -107,6 +116,15 @@ export const MOCK_STATS = {
         'RINGS OF WRATH': theaterEntry(0, 0, []),
       },
       last_played: Date.now() - 259200000,
+      role_distribution: { TOP: 44, JUNGLE: 0, MIDDLE: 0, BOTTOM: 0, UTILITY: 1 },
+      class_distribution: { Fighter: 45, Tank: 3 },
+      profile_tags: [
+        { label: 'FRONTLINE DOCTRINE', category: 'class', strength: 1.0 },
+        { label: 'TOP SPECIALIST', category: 'role', strength: 0.98 },
+        { label: 'ALL-MALE ROSTER', category: 'gender', strength: 1.0 },
+      ],
+      primary_role: 'TOP',
+      primary_class: 'Fighter',
     },
     {
       puuid: PU.cos, user_id: 'mock-user-3', name: 'Coslett',
@@ -131,6 +149,14 @@ export const MOCK_STATS = {
         ]),
       },
       last_played: Date.now() - 43200000,
+      role_distribution: { TOP: 2, JUNGLE: 8, MIDDLE: 18, BOTTOM: 4, UTILITY: 3 },
+      class_distribution: { Assassin: 20, Mage: 10, Fighter: 5, Tank: 4, Marksman: 4 },
+      profile_tags: [
+        { label: 'MID / JGL FLEX', category: 'role', strength: 0.74 },
+        { label: 'SHADOW OPERATIVE', category: 'trait', strength: 0.46 },
+      ],
+      primary_role: 'MIDDLE',
+      primary_class: 'Assassin',
     },
     {
       puuid: PU.lyu, user_id: 'mock-user-5', name: 'lyu',
@@ -154,6 +180,15 @@ export const MOCK_STATS = {
         ]),
       },
       last_played: Date.now() - 518400000,
+      role_distribution: { TOP: 0, JUNGLE: 0, MIDDLE: 0, BOTTOM: 18, UTILITY: 2 },
+      class_distribution: { Marksman: 18, Mage: 4 },
+      profile_tags: [
+        { label: 'BOT SPECIALIST', category: 'role', strength: 0.90 },
+        { label: 'PRECISION DOCTRINE', category: 'class', strength: 0.90 },
+        { label: 'HIGH MOBILITY ASSET', category: 'trait', strength: 0.60 },
+      ],
+      primary_role: 'BOTTOM',
+      primary_class: 'Marksman',
     },
     {
       puuid: PU.cat, user_id: 'mock-user-2', name: 'iHazACatz',
@@ -177,6 +212,15 @@ export const MOCK_STATS = {
         ]),
       },
       last_played: Date.now() - 172800000,
+      role_distribution: { TOP: 0, JUNGLE: 0, MIDDLE: 0, BOTTOM: 0, UTILITY: 22 },
+      class_distribution: { Enchanter: 52 },
+      profile_tags: [
+        { label: 'SUPPORT SPECIALIST', category: 'role', strength: 1.0 },
+        { label: 'SUPPORT CORPS', category: 'class', strength: 1.0 },
+        { label: 'ALL-FEMALE ROSTER', category: 'gender', strength: 1.0 },
+      ],
+      primary_role: 'UTILITY',
+      primary_class: 'Enchanter',
     },
   ],
 
