@@ -765,6 +765,15 @@ footer.site-footer {
   letter-spacing: -0.3px;
   position: relative;
 }
+.hero .tagline-plain {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text);
+  max-width: 560px;
+  line-height: 1.8;
+  margin-bottom: 18px;
+  position: relative;
+}
 .hero .tagline-sub {
   font-family: var(--font-mono);
   font-size: 14px;

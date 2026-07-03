@@ -30,6 +30,15 @@ export default function About() {
           </div>
           <h1 className="title-hero">About LEGION</h1>
           <p className="lead">
+            LEGION is a stats tracker for groups of League of Legends players.
+            Where op.gg and Porofessor show how you do individually, LEGION
+            shows how your friend group does when you queue up{' '}
+            <em>together</em>: your combined win rate, which pairs of you win
+            the most, your most active hours, and how your play shifts after a
+            loss. Create a group, link your Riot accounts, and LEGION pulls
+            your shared matches from the official Riot Games API.
+          </p>
+          <p className="lead">
             LEGION operates under ZOO directive <R w={54} h={13} />. Files are
             maintained on cells of two or more cooperating operators conducting
             joint deployments. Engagements are logged, indexed, and assessed

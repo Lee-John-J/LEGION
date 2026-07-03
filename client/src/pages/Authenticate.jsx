@@ -68,8 +68,9 @@ export default function Authenticate() {
           </div>
           <h1 className="form-title">Authenticate</h1>
           <p className="form-subtitle">
-            Sign in to an existing operator file, or open a new one. Cell
-            designation follows after authentication.
+            Sign in to an existing operator file, or open a new one. Your cell
+            &mdash; the group you play with &mdash; is created or joined in the
+            next step.
           </p>
 
           <div className="auth-tabs" role="tablist">

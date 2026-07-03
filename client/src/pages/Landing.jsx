@@ -11,6 +11,12 @@ export default function Landing() {
       <section className="hero intel-stagger">
         <h1>LEGION</h1>
         <p className="tagline">Surveillance on cells that queue together.</p>
+        <p className="tagline-plain">
+          Track how you and your friends actually perform when you play League
+          of Legends <em>together</em> &mdash; combined win rates, which duos
+          click, when you&rsquo;re most active, and how your group holds up
+          after a loss.
+        </p>
         <p className="tagline-sub">
           LEGION compiles intelligence on cells of two or more cooperating
           operators. Joint deployments are logged, indexed, and assessed against{' '}
