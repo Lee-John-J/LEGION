@@ -3,6 +3,16 @@ const https = require('https')
 const router = express.Router()
 const { supabase } = require('../db/supabase')
 
+// Typed Riot API failure so route handlers can tell "user typed a bad
+// Riot ID" apart from "our key is bad" and "Riot is down".
+class RiotApiError extends Error {
+  constructor(kind, status) {
+    super(`${kind}:${status}`)
+    this.kind = kind // 'NOT_FOUND' | 'BAD_KEY' | 'RATE_LIMITED' | 'RIOT_DOWN' | 'NETWORK'
+    this.status = status
+  }
+}
+
 // Direct Riot API lookup using Node https module (fetch was failing on Vercel)
 function lookupRiotAccount(gameName, tagLine) {
   return new Promise((resolve, reject) => {
@@ -19,17 +29,40 @@ function lookupRiotAccount(gameName, tagLine) {
       let body = ''
       res.on('data', (chunk) => { body += chunk })
       res.on('end', () => {
-        if (res.statusCode === 404) return reject(new Error('NOT_FOUND'))
-        if (res.statusCode !== 200) return reject(new Error(`RIOT_API_ERROR:${res.statusCode}:${body}`))
-        try { resolve(JSON.parse(body)) }
-        catch { reject(new Error(`RIOT_PARSE_ERROR:${body.slice(0, 200)}`)) }
+        if (res.statusCode === 200) {
+          try { return resolve(JSON.parse(body)) }
+          catch { return reject(new RiotApiError('RIOT_DOWN', 200)) }
+        }
+        if (res.statusCode === 404) return reject(new RiotApiError('NOT_FOUND', 404))
+        if (res.statusCode === 401 || res.statusCode === 403) {
+          // Our problem, not the user's: missing/expired RIOT_API_KEY.
+          // Never log the key value itself.
+          console.error(`[riot] auth failure (${res.statusCode}) — check RIOT_API_KEY in this environment`)
+          return reject(new RiotApiError('BAD_KEY', res.statusCode))
+        }
+        if (res.statusCode === 429) return reject(new RiotApiError('RATE_LIMITED', 429))
+        return reject(new RiotApiError(res.statusCode >= 500 ? 'RIOT_DOWN' : 'NETWORK', res.statusCode))
       })
     })
 
-    req.on('error', (err) => reject(new Error(`RIOT_NETWORK_ERROR:${err.message}`)))
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error('RIOT_TIMEOUT')) })
+    req.on('error', () => reject(new RiotApiError('NETWORK', 0)))
+    req.setTimeout(8000, () => { req.destroy(); reject(new RiotApiError('NETWORK', 0)) })
     req.end()
   })
+}
+
+// Map a RiotApiError to the HTTP response the client shows the user.
+// BAD_KEY / RIOT_DOWN / NETWORK all read as "unavailable" to the user;
+// the server log (above) is what distinguishes a config problem.
+function sendRiotError(res, err) {
+  if (err.kind === 'NOT_FOUND') {
+    return res.status(404).json({ code: 'RIOT_ID_NOT_FOUND', error: 'INTAKE FAILED. RIOT ID NOT FOUND.' })
+  }
+  if (err.kind === 'RATE_LIMITED') {
+    return res.status(429).json({ code: 'RATE_LIMITED', error: 'INTAKE QUEUE SATURATED. STAND BY, THEN RE-SUBMIT.' })
+  }
+  console.error('[riot] lookup failed:', err.kind, err.status)
+  return res.status(503).json({ code: 'RIOT_UNAVAILABLE', error: 'RIOT API UNAVAILABLE. TRY AGAIN SHORTLY.' })
 }
 
 async function requireAuth(req, res, next) {
@@ -51,10 +84,7 @@ router.post('/validate-riot-id', async (req, res) => {
     const account = await lookupRiotAccount(riotGameName, riotTagLine)
     res.json({ valid: true, gameName: account.gameName, tagLine: account.tagLine })
   } catch (err) {
-    if (err.message === 'NOT_FOUND') {
-      return res.status(404).json({ error: 'INTAKE FAILED. RIOT ID NOT FOUND IN RIOT RECORDS.' })
-    }
-    return res.status(502).json({ error: 'RIOT API UNAVAILABLE. TRY AGAIN SHORTLY.' })
+    return sendRiotError(res, err)
   }
 })
 
@@ -70,11 +100,7 @@ router.post('/link', requireAuth, async (req, res) => {
     try {
       account = await lookupRiotAccount(riotGameName, riotTagLine)
     } catch (err) {
-      if (err.message === 'NOT_FOUND') {
-        return res.status(404).json({ error: 'OPERATOR NOT FOUND IN RIOT RECORDS' })
-      }
-      console.error('[LEGION] Riot API error during link:', err.message)
-      return res.status(502).json({ error: 'RIOT API UNAVAILABLE. TRY AGAIN SHORTLY.' })
+      return sendRiotError(res, err)
     }
 
     const { data: existing } = await sb

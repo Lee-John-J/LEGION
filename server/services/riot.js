@@ -115,6 +115,12 @@ async function riotFetch(url, retries = 2) {
     throw new Error('NOT_FOUND')
   }
 
+  if (res.status === 401 || res.status === 403) {
+    // Our problem, not the caller's: missing/expired RIOT_API_KEY.
+    console.error(`[RIOT] auth failure (${res.status}) — check RIOT_API_KEY in this environment`)
+    throw new Error(`BAD_KEY:${res.status}`)
+  }
+
   if (!res.ok) {
     throw new Error(`RIOT_API_ERROR:${res.status}`)
   }
