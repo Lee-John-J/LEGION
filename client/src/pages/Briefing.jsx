@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { MOCK_STATS, isMockCell } from '../lib/mockData'
-import AuthOverlay from '../components/AuthOverlay'
 import CellOverlay from '../components/CellOverlay'
 import Footer from '../components/Footer'
 
@@ -426,7 +425,6 @@ export default function Briefing() {
 
   return (
     <>
-      {!user && <AuthOverlay />}
       {user && <CellOverlay />}
 
       {/* ── PAGE HEADER BAR ── */}

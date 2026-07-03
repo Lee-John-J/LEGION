@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { MOCK_OPERATIONS, isMockCell } from '../lib/mockData'
-import AuthOverlay from '../components/AuthOverlay'
 import CellOverlay from '../components/CellOverlay'
 import Footer from '../components/Footer'
 
@@ -263,7 +262,6 @@ export default function OperationLog() {
 
   return (
     <>
-      {!user && <AuthOverlay />}
       {user && <CellOverlay />}
 
       <div className="page-header-bar">

@@ -21,8 +21,12 @@ export default function App() {
           <Route path="/intake" element={
             <ProtectedRoute><Intake /></ProtectedRoute>
           } />
-          <Route path="/briefing" element={<Briefing />} />
-          <Route path="/oplog" element={<OperationLog />} />
+          <Route path="/briefing" element={
+            <ProtectedRoute><Briefing /></ProtectedRoute>
+          } />
+          <Route path="/oplog" element={
+            <ProtectedRoute><OperationLog /></ProtectedRoute>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
