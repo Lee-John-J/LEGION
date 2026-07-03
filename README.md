@@ -1,14 +1,42 @@
 # LEGION
 
-**Group intelligence for League of Legends.**
+Group stats for League of Legends. LEGION tracks how a **group of friends performs when they play together** — not individual stats (op.gg and Porofessor already do that), but the win rates, duo synergies, and behavioral patterns that only show up when 2+ of you are in the same game.
 
-LEGION tracks how your friend group performs *together* — not as individuals. Every stat, chart, and metric is filtered to **joint deployments**: matches where two or more members of your group were on the same team. Solo games are out of scope. LEGION only cares about the games you play together.
+**→ Live: [legion-pi-nine.vercel.app](https://legion-pi-nine.vercel.app)**
 
 The entire app is themed as a Cold War classified intelligence dossier — aged paper, typewriter fonts, classification stamps, redacted text blocks. Friend groups are **cells**, players are **operators**, the dashboard is a **briefing**.
 
----
+## What you get
 
-## Tech Stack
+- **Combined win rate** across games your group played together
+- **Duo win rates** — which pairs of you actually win
+- **Champion pools** per player, with playstyle classification (ONE-TRICK, SPECIALIST, CHAOTIC, etc.)
+- **Activity heatmap** — when your group is most active (7-day × 24-hour grid)
+- **Behavioral read** on how the group holds up after losses (Tilt Index, Link Analysis)
+- **Operation Log** — filterable joint match history grouped by day
+- Match data pulled from the **official Riot Games API**
+
+Solo games are out of scope. LEGION only cares about the games you play together.
+
+## Run it locally
+
+Prerequisites: Node 18+, a [Supabase](https://supabase.com) project with `supabase_schema.sql` applied, and a [Riot Games API key](https://developer.riotgames.com) (dev keys expire every 24 hours).
+
+```bash
+# Backend
+cd server
+npm install
+cp ../.env.example .env     # fill in: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RIOT_API_KEY
+node index.js               # http://localhost:3001
+
+# Frontend (separate terminal)
+cd client
+npm install
+cp .env.example .env        # fill in: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+npm run dev                 # http://localhost:5173, proxies /api to :3001
+```
+
+## Stack
 
 | Layer | Technology |
 |---|---|
@@ -17,33 +45,16 @@ The entire app is themed as a Cold War classified intelligence dossier — aged 
 | Database | PostgreSQL via Supabase |
 | Auth | Supabase Auth (email + password) |
 | External API | Riot Games API v5 |
-| Deployment | Vercel (static frontend + serverless API) |
+| Deployment | Vercel (static frontend + serverless API via `api/[...path].js`) |
 
-## Features
-
-- **Cell management** — Create a named group, invite friends via `LGN-XXXX-XXXX` codes, manage members
-- **Riot API integration** — Rate-limited (token bucket), cached, resume-able match sync
-- **Briefing dashboard** — Eight stat sections:
-  - Cell member summary with joint win rate and delta badges
-  - Game mode breakdown with 5-tier color scale
-  - N x N duo win rate matrix
-  - 7-day x 24-hour activity heatmap
-  - Champion pool classification (ONE-TRICK, SPECIALIST, CHAOTIC, etc.)
-  - Tilt Index behavioral threat assessment
-  - Link Analysis SVG network graph with bond classification
-  - Analyst observation cards with randomized redactions
-- **Operation Log** — Filterable joint match history grouped by day
-- **Handler role** — Group admin can remove members, dissolve cells, regenerate invite codes
-- **Auth system** — Registration with Riot ID validation, JWT-protected routes, session recovery
-
-## Project Structure
+## Project structure
 
 ```
 LEGION/
 ├── client/                 React frontend (Vite)
 │   └── src/
 │       ├── pages/          6 page components (Briefing is ~1,350 lines)
-│       ├── components/     Reusable UI (Header, AuthOverlay, ConfirmModal, etc.)
+│       ├── components/     Reusable UI (Header, ConfirmModal, etc.)
 │       ├── hooks/          Auth context + session management
 │       └── lib/            Supabase client, API wrapper, mock data
 │
@@ -51,33 +62,14 @@ LEGION/
 │   ├── routes/             REST endpoints (cells, operators)
 │   └── services/           Riot API client (rate limiter + cache), stats engine
 │
+├── api/                    Vercel serverless entry point (wraps server/)
 ├── mockups/                Static HTML/CSS reference designs
 ├── supabase_schema.sql     Database schema (4 tables, 9 RLS policies, GIN index)
 ├── CLAUDE.md               Project spec and development guide
 └── vercel.json             Deployment configuration
 ```
 
-## Local Development
-
-```bash
-# Backend
-cd server
-npm install
-cp ../.env.example .env     # fill in your Supabase + Riot API keys
-node index.js               # runs on http://localhost:3001
-
-# Frontend (separate terminal)
-cd client
-npm install
-cp .env.example .env        # fill in your Supabase public key
-npm run dev                 # runs on http://localhost:5173, proxies /api to :3001
-```
-
-You'll need:
-- A [Supabase](https://supabase.com) project with the schema from `supabase_schema.sql` applied
-- A [Riot Games API key](https://developer.riotgames.com) (dev keys expire every 24 hours)
-
-## Design System
+## Design system
 
 The visual language is defined in `mockups/dossier.css` and implemented in `client/src/index.css`:
 
@@ -86,7 +78,7 @@ The visual language is defined in `mockups/dossier.css` and implemented in `clie
 - **Redactions:** Three styles of decorative black bars for empty states and classified flavor
 - **Animations:** Declassification reveal on page load, scanner sweep loading states
 
-## Key Terminology
+## Key terminology
 
 | Normal | LEGION |
 |---|---|
@@ -99,6 +91,6 @@ The visual language is defined in `mockups/dossier.css` and implemented in `clie
 | Login | Authenticate |
 | Match with 2+ members on same team | Joint Deployment |
 
-## Built With
+## Built with
 
-This project was built collaboratively using [Claude Code](https://claude.ai/code) (Anthropic's AI development tool) over 58 commits. The full project spec that guided development is in [`CLAUDE.md`](CLAUDE.md).
+This project was built collaboratively using [Claude Code](https://claude.ai/code) (Anthropic's AI development tool). The full project spec that guided development is in [`CLAUDE.md`](CLAUDE.md).
