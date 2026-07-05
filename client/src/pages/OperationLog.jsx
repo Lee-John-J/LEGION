@@ -118,6 +118,15 @@ function isRotating(modeName) {
   return !STAPLE_MODES.includes(modeName)
 }
 
+// Lane order for Summoner's Rift games with assigned roles
+const ROLE_ORDER = { TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4 }
+
+// Arena final standing: 1 -> "1ST", 2 -> "2ND", etc.
+function formatPlacement(n) {
+  const suffix = n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH'
+  return `${n}${suffix}`
+}
+
 export default function OperationLog() {
   const { user, activeCell } = useAuth()
   const [operations, setOperations] = useState(null)
@@ -457,6 +466,11 @@ export default function OperationLog() {
                       <span className={`match-mode${isRotating(resolveMode(op.game_mode, op.queue_id)) ? ' mode-rotating' : ''}`}>
                         {resolveMode(op.game_mode, op.queue_id)}
                       </span>
+                      {op.placement != null && (
+                        <span className={`match-placement${op.placement === 1 ? ' first' : ''}`}>
+                          {formatPlacement(op.placement)} OF 8
+                        </span>
+                      )}
                       <span className="match-duration">{formatDuration(op.game_duration)}</span>
                       <span className="match-time">{formatTime(op.game_end_timestamp)}</span>
                     </div>
@@ -471,7 +485,13 @@ export default function OperationLog() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...op.participants].sort((a, b) => allOperatorNames.indexOf(a.name) - allOperatorNames.indexOf(b.name)).map((p, pi) => (
+                        {[...op.participants].sort((a, b) => {
+                          // SR games with assigned lanes: top -> jungle -> mid -> bot -> support
+                          if (a.role in ROLE_ORDER && b.role in ROLE_ORDER) {
+                            return ROLE_ORDER[a.role] - ROLE_ORDER[b.role]
+                          }
+                          return allOperatorNames.indexOf(a.name) - allOperatorNames.indexOf(b.name)
+                        }).map((p, pi) => (
                           <tr key={pi}>
                             <td className={`op-name${p.name === currentUserName ? ' you' : ''}`}>
                               {p.name}

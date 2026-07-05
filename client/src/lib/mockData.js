@@ -345,8 +345,11 @@ const CHAMP_POOL = {
 const OP_NAMES = ['jimmmaaayyy', 'iHazACatz', 'Coslett', 'Pin Pon', 'lyu']
 const QUEUE_MAP = { Ranked: 420, Normal: 400, ARAM: 450, 'Ranked Flex': 440, Arena: 1700 }
 const MODE_MAP = { Ranked: 'CLASSIC', Normal: 'CLASSIC', ARAM: 'ARAM', 'Ranked Flex': 'CLASSIC', Arena: 'CHERRY' }
-const MODES = ['Ranked', 'Ranked', 'Normal', 'ARAM', 'Ranked', 'Normal', 'Ranked Flex', 'ARAM']
+const MODES = ['Ranked', 'Ranked', 'Normal', 'ARAM', 'Ranked', 'Arena', 'Normal', 'Ranked Flex', 'ARAM', 'Arena']
 const POOL_KEYS = ['jim', 'cat', 'cos', 'pin', 'lyu']
+// Assigned lane per operator for SR games (matches each champ pool's flavor)
+const ROLE_BY_IDX = ['BOTTOM', 'UTILITY', 'MIDDLE', 'TOP', 'JUNGLE']
+const SR_MODES = ['Ranked', 'Normal', 'Ranked Flex']
 
 function seededRand(seed) {
   let s = seed
@@ -362,7 +365,9 @@ function generateMockOperations() {
     const ts = now - (i * 4.2 * 3600000) - rand() * 7200000
     const win = rand() > 0.47
     const mode = MODES[Math.floor(rand() * MODES.length)]
-    const numPlayers = rand() > 0.4 ? (rand() > 0.5 ? 3 : 2) : (rand() > 0.6 ? 5 : 4)
+    const isArena = mode === 'Arena'
+    // Arena subteams hold exactly two players
+    const numPlayers = isArena ? 2 : rand() > 0.4 ? (rand() > 0.5 ? 3 : 2) : (rand() > 0.6 ? 5 : 4)
     const indices = [0, 1, 2, 3, 4].sort(() => rand() - 0.5).slice(0, numPlayers)
     if (!indices.includes(0) && rand() > 0.3) indices[0] = 0
 
@@ -377,6 +382,7 @@ function generateMockOperations() {
         damage: Math.floor(12000 + rand() * 25000),
         gold: Math.floor(8000 + rand() * 10000),
         win,
+        role: SR_MODES.includes(mode) ? ROLE_BY_IDX[idx] : null,
       }
     })
 
@@ -388,6 +394,8 @@ function generateMockOperations() {
       game_end_timestamp: ts,
       cell_members: participants.map(p => p.name),
       cell_members_won: win,
+      // Arena: wins land top four, losses bottom four (mirrors Riot's win flag)
+      placement: isArena ? (win ? 1 + Math.floor(rand() * 4) : 5 + Math.floor(rand() * 4)) : null,
       participants,
     })
   }

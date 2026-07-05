@@ -571,11 +571,14 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
     const participants = match.info?.participants ?? []
     const allCellInMatch = participants.filter((p) => puuidSet.has(p.puuid))
 
-    // Group cell members by teamId — only count as joint if 2+ on SAME team
+    // Group cell members by teamId — only count as joint if 2+ on SAME team.
+    // Arena (CHERRY) games have 8 subteams of 2; teamId lumps 4 subteams
+    // together, so group by playerSubteamId there instead.
     if (allCellInMatch.length < 2) continue
+    const isArena = match.info?.gameMode === 'CHERRY' || match.info?.queueId === 1700
     const byTeam = {}
     for (const p of allCellInMatch) {
-      const tid = p.teamId
+      const tid = isArena ? p.playerSubteamId : p.teamId
       if (!byTeam[tid]) byTeam[tid] = []
       byTeam[tid].push(p)
     }
@@ -599,6 +602,8 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
         return m?.riot_game_name ?? p.riotIdGameName ?? 'UNKNOWN'
       }),
       cell_members_won: cellParticipants[0].win,
+      // Arena final standing (1-8) — placement is per-subteam, so any member's value works
+      placement: isArena ? (cellParticipants[0].placement ?? cellParticipants[0].subteamPlacement ?? null) : null,
       participants: cellParticipants.map((p) => ({
         name: members.find((m) => m.puuid === p.puuid)?.riot_game_name ?? p.riotIdGameName,
         champion: p.championName,
@@ -608,6 +613,8 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
         damage: p.totalDamageDealtToChampions,
         gold: p.goldEarned,
         win: p.win,
+        // Assigned lane (TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY) — empty for ARAM/Arena
+        role: p.teamPosition || null,
       })),
     })
   }
