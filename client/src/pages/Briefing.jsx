@@ -58,16 +58,6 @@ function modeWrClass(rate) {
   return 'wr-low'
 }
 
-function matrixCellClass(wr, games) {
-  if (wr === null) return 'matrix-self'
-  if (games < 5) return 'matrix-empty'
-  const r = wr <= 1 ? wr * 100 : wr
-  if (r < 48) return 'wr-low'
-  if (r < 54) return 'wr-mid'
-  if (r < 62) return 'wr-high'
-  return 'wr-great'
-}
-
 /* ── Mode name normalization ── */
 const STAPLE_MODES = ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'ARAM Mayhem', 'Arena']
 
@@ -186,30 +176,6 @@ function buildLinkSVG(ops, duoStats) {
   const n = Math.min(active.length, 7)
   if (n < 1) return null
 
-  const cx = 200, cy = 175
-  const r = 110
-
-  // Position active nodes — special-case small node counts
-  let positions
-  if (n === 1) {
-    positions = [{ x: cx, y: cy }]
-  } else if (n === 2) {
-    positions = [{ x: cx - 120, y: cy }, { x: cx + 120, y: cy }]
-  } else {
-    positions = active.slice(0, n).map((_, i) => {
-      const angle = (2 * Math.PI * i) / n - Math.PI / 2
-      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
-    })
-  }
-
-  const inactivePositions = inactive.map((_, i) => {
-    const angle = (2 * Math.PI * i) / Math.max(inactive.length, 1) + Math.PI / 6
-    return {
-      x: cx + (r + 55) * Math.cos(angle),
-      y: cy + (r + 55) * Math.sin(angle),
-    }
-  })
-
   // Build a lookup from duo_stats for quick pair matching
   const duoLookup = new Map()
   if (duoStats) {
@@ -248,7 +214,29 @@ function buildLinkSVG(ops, duoStats) {
     }
   }
 
-  return { active, inactive, positions, inactivePositions, edges, n, cx, cy, r }
+  // ── Layout: ring on a fixed canvas — the SVG scales it to fit the panel.
+  // r pushes close to the canvas edge; name labels are clamped inside, so
+  // the ring can claim margin space that used to sit empty ──
+  const cx = 200, cy = 175
+  const r = 125
+  let positions
+  if (n === 1) {
+    positions = [{ x: cx, y: cy }]
+  } else if (n === 2) {
+    positions = [{ x: cx - 135, y: cy }, { x: cx + 135, y: cy }]
+  } else {
+    positions = active.slice(0, n).map((_, i) => {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2
+      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
+    })
+  }
+
+  const inactivePositions = inactive.map((_, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(inactive.length, 1) + Math.PI / 6
+    return { x: cx + (r + 45) * Math.cos(angle), y: cy + (r + 45) * Math.sin(angle) }
+  })
+
+  return { active, inactive, positions, inactivePositions, edges, n, cx, cy, boxW: 400, boxH: 370 }
 }
 
 export default function Briefing() {
@@ -257,6 +245,8 @@ export default function Briefing() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  // Index of the active operator being hovered in Link Analysis (null = none)
+  const [hoverOp, setHoverOp] = useState(null)
 
   const cellId = activeCell?.id
   const hasCell = !!(user && activeCell)
@@ -317,34 +307,6 @@ export default function Briefing() {
       dataByName.get(name) || { mode: name, name, games: 0, win_rate: null }
     )
     return { stapleModes: staple, rotatingModes: rotating }
-  }, [hasData, stats])
-
-  // Build duo matrix from duo_stats + operator_stats
-  const matrixData = useMemo(() => {
-    if (!hasData || !stats.operator_stats) return null
-    const ops = stats.operator_stats
-    const n = ops.length
-    // Build lookup from duo_stats — keyed by PUUID (name-change-proof), name fallback
-    const lookup = {}
-    if (stats.duo_stats) {
-      stats.duo_stats.forEach(d => {
-        const wr = d.win_rate <= 1 ? d.win_rate * 100 : d.win_rate
-        const val = { wr, games: d.games }
-        // PUUID keys (permanent — survives name changes)
-        if (d.puuids?.[0] && d.puuids?.[1]) {
-          lookup[`${d.puuids[0]}|${d.puuids[1]}`] = val
-          lookup[`${d.puuids[1]}|${d.puuids[0]}`] = val
-        }
-        // Name keys (fallback for display-only / mock data)
-        const n0 = d.names?.[0], n1 = d.names?.[1]
-        if (n0 && n1) {
-          lookup[`${n0}|${n1}`] = val
-          lookup[`${n1}|${n0}`] = val
-        }
-      })
-    }
-    const codes = ops.map(op => op.name.slice(0, 3).toUpperCase())
-    return { ops, codes, n, lookup }
   }, [hasData, stats])
 
   // Build heatmap — API returns UTC [day][hour] counts, day 0 = Sunday
@@ -759,69 +721,153 @@ export default function Briefing() {
             ════════════════════════════ */}
         <div className="two-col intel-reveal reveal-d2">
 
-          {/* Duo Win Rate Matrix */}
+          {/* Link Analysis — pair network graph */}
           <div className="card vis-panel">
-            <div className="panel-title">Duo Win Rates</div>
-            <div className="panel-subtitle">Win rate when any two operators deploy together</div>
+            <div className="panel-title">Link Analysis</div>
+            <div className="panel-subtitle">Joint win rate by operator pair. Hover an operator to isolate their links.</div>
             <div className="panel-body">
-              {matrixData ? (
-                <div
-                  className="matrix-grid data-reveal"
-                  style={{
-                    gridTemplateColumns: `48px repeat(${matrixData.n}, minmax(0, 1fr))`,
-                    gridTemplateRows: `36px repeat(${matrixData.n}, 1fr)`,
-                  }}
-                >
-                  {/* Top-left empty corner */}
-                  <div />
-                  {/* Column headers */}
-                  {matrixData.ops.map((op, ci) => (
-                    <div key={`col-${ci}`} className="matrix-label-top">{matrixData.codes[ci]}</div>
-                  ))}
-                  {/* Rows */}
-                  {matrixData.ops.flatMap((rowOp, ri) => [
-                      <div key={`row-label-${ri}`} className="matrix-label">{matrixData.codes[ri]}</div>,
-                      ...matrixData.ops.map((colOp, ci) => {
-                        if (ri === ci) {
-                          return (
-                            <div key={`cell-${ri}-${ci}`} className="matrix-cell matrix-self">—</div>
-                          )
-                        }
-                        const entry = matrixData.lookup[`${rowOp.puuid}|${colOp.puuid}`]
-                          || matrixData.lookup[`${rowOp.name}|${colOp.name}`]
-                        const wr = entry?.wr ?? null
-                        const games = entry?.games ?? 0
-                        const cellClass = matrixCellClass(wr, games)
-                        const displayWr = wr != null ? `${wr.toFixed(0)}%` : ''
-                        const tooltip = wr != null
-                          ? `${rowOp.name} + ${colOp.name}: ${wr.toFixed(1)}% over ${games} games`
-                          : `${rowOp.name} + ${colOp.name}: insufficient data`
-                        return (
-                          <div
-                            key={`cell-${ri}-${ci}`}
-                            className={`matrix-cell ${cellClass}`}
-                            data-tooltip={tooltip}
-                          >
-                            {games >= 5 ? displayWr : ''}
-                          </div>
-                        )
-                      }),
-                  ])}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 3, marginTop: 20 }}>
-                  {Array.from({ length: 36 }).map((_, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        height: 32,
-                        background: 'var(--ink)', opacity: 0.6,
-                        borderRadius: 3,
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="link-svg-wrap">
+                {linkData ? (
+                  <svg
+                    className="link-svg data-reveal"
+                    viewBox={`0 0 ${linkData.boxW} ${linkData.boxH}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {/* Edges — complete graph; stats appear on hover only */}
+                    {linkData.edges.map((e, i) => {
+                      const p1 = linkData.positions[e.i1]
+                      const p2 = linkData.positions[e.i2]
+                      if (!p1 || !p2) return null
+                      const midX = (p1.x + p2.x) / 2
+                      const midY = (p1.y + p2.y) / 2
+                      // Hover focus: edges touching the hovered operator get emphasis,
+                      // everything else fades back
+                      const hovering = hoverOp !== null
+                      const isHot = hovering && (e.i1 === hoverOp || e.i2 === hoverOp)
+                      const isDim = hovering && !isHot
+                      return (
+                        <g key={`edge-${i}`} className="link-el" opacity={isDim ? 0.07 : 1}>
+                          <line
+                            x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+                            stroke={e.stroke} strokeWidth={isHot ? e.width + 0.75 : e.width}
+                            strokeDasharray={e.dashed ? '4,3' : 'none'}
+                            strokeOpacity={e.noData ? 0.3 : isHot ? 1 : 0.75}
+                          />
+                          {/* WR pill always visible; shared games + bond class join it on hover */}
+                          {!e.noData && (
+                            <>
+                              <rect
+                                x={midX - (isHot ? 27 : 18)} y={midY - (isHot ? 14 : 9)}
+                                width={isHot ? 54 : 36} height={isHot ? 28 : 16} rx={2}
+                                fill="var(--card)" stroke={e.stroke}
+                                strokeWidth={isHot ? 1 : 0.75} opacity={0.95} />
+                              <text x={midX} y={midY + (isHot ? -2 : 3)} textAnchor="middle"
+                                fontFamily="Courier Prime, monospace"
+                                fontSize={isHot ? 11.5 : 9.5}
+                                fontWeight="700" fill={e.stroke}>
+                                {e.wr}%
+                              </text>
+                              {isHot && (
+                                <>
+                                  <text x={midX} y={midY + 9} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                                    letterSpacing="1" fill="var(--muted)">
+                                    {e.games} OPS
+                                  </text>
+                                  <text x={midX} y={midY + 26} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                                    letterSpacing="1.5" fill={e.bond.color}>
+                                    {e.bond.label}
+                                  </text>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {e.noData && isHot && (
+                            <text x={midX} y={midY + 4} textAnchor="middle"
+                              fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                              letterSpacing="1" fill="var(--muted-light)" opacity={0.5}>
+                              UNLINKED
+                            </text>
+                          )}
+                        </g>
+                      )
+                    })}
+
+                    {/* Active nodes — crosshair target markers */}
+                    {linkData.active.slice(0, linkData.n).map((op, i) => {
+                      const p = linkData.positions[i]
+                      if (!p) return null
+                      // Push label outward from center so it never overlaps edges
+                      const angle = Math.atan2(p.y - linkData.cy, p.x - linkData.cx)
+                      const labelDist = 26
+                      const rawLx = p.x + labelDist * Math.cos(angle)
+                      const ly = p.y + labelDist * Math.sin(angle)
+                      const dx = p.x - linkData.cx
+                      const anchor = dx > 15 ? 'start' : dx < -15 ? 'end' : 'middle'
+                      // Clamp so long names never run off the canvas
+                      const lx = anchor === 'start' ? Math.min(rawLx, linkData.boxW - 78)
+                        : anchor === 'end' ? Math.max(rawLx, 78)
+                        : Math.min(Math.max(rawLx, 42), linkData.boxW - 42)
+                      // For top-center nodes, nudge label upward; for bottom, downward
+                      const vertNudge = Math.abs(dx) <= 15 ? (p.y < linkData.cy ? -6 : 6) : 0
+                      const nodeDim = hoverOp !== null && hoverOp !== i
+                      return (
+                        <g key={op.puuid || i} className="link-el" opacity={nodeDim ? 0.18 : 1}
+                          onMouseEnter={() => setHoverOp(i)}
+                          onMouseLeave={() => setHoverOp(null)}>
+                          {/* Invisible hit area so the hover target is generous */}
+                          <circle cx={p.x} cy={p.y} r={22} fill="transparent" />
+                          {/* Crosshair arms */}
+                          <line x1={p.x - 10} y1={p.y} x2={p.x - 4} y2={p.y} stroke="var(--text)" strokeWidth={0.75} />
+                          <line x1={p.x + 4} y1={p.y} x2={p.x + 10} y2={p.y} stroke="var(--text)" strokeWidth={0.75} />
+                          <line x1={p.x} y1={p.y - 10} x2={p.x} y2={p.y - 4} stroke="var(--text)" strokeWidth={0.75} />
+                          <line x1={p.x} y1={p.y + 4} x2={p.x} y2={p.y + 10} stroke="var(--text)" strokeWidth={0.75} />
+                          {/* Center dot */}
+                          <circle cx={p.x} cy={p.y} r={2.5} fill="var(--text)" />
+                          {/* Operator name — pushed outward from center */}
+                          <text x={lx} y={ly + vertNudge} textAnchor={anchor}
+                            fontFamily="IBM Plex Mono, monospace" fontSize="10" fontWeight="600"
+                            letterSpacing="1.2" fill="var(--text)">
+                            {op.name.toUpperCase()}
+                          </text>
+                          <text x={lx} y={ly + vertNudge + 12} textAnchor={anchor}
+                            fontFamily="IBM Plex Mono, monospace" fontSize="8" fontWeight="400"
+                            fill="var(--muted)">
+                            {op.games} OPS
+                          </text>
+                        </g>
+                      )
+                    })}
+
+                    {/* Inactive nodes — faded minimal markers */}
+                    {linkData.inactive.map((op, i) => {
+                      const p = linkData.inactivePositions[i]
+                      if (!p) return null
+                      return (
+                        <g key={`inactive-${op.puuid || i}`} className="link-el"
+                          opacity={hoverOp !== null ? 0.12 : 0.35}>
+                          <line x1={p.x - 5} y1={p.y} x2={p.x + 5} y2={p.y} stroke="var(--muted)" strokeWidth={0.5} />
+                          <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 5} stroke="var(--muted)" strokeWidth={0.5} />
+                          <text x={p.x} y={p.y + 14} textAnchor="middle"
+                            fontFamily="IBM Plex Mono, monospace" fontSize="9" fontWeight="600"
+                            letterSpacing="1" fill="var(--muted)">
+                            {op.name.toUpperCase()}
+                          </text>
+                        </g>
+                      )
+                    })}
+                  </svg>
+                ) : (
+                  <div style={{
+                    width: 140, height: 140, borderRadius: '50%',
+                    border: '2px dashed var(--ink)', opacity: 0.5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <R w={60} h={12} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1052,9 +1098,9 @@ export default function Briefing() {
         </div>
 
         {/* ════════════════════════════
-            ANALYST ROW: TILT + LINK
+            ANALYST ROW: TILT INDEX
             ════════════════════════════ */}
-        <div className="analyst-row intel-reveal reveal-d5">
+        <div className="analyst-solo intel-reveal reveal-d5">
 
           {/* TILT INDEX */}
           <div className="card fun-card">
@@ -1136,148 +1182,6 @@ export default function Briefing() {
             </div>
           </div>
 
-          {/* LINK ANALYSIS */}
-          <div className="card fun-card link-panel">
-            <div className="fun-label">&bull; Network Intelligence</div>
-            <div className="fun-title">Link Analysis</div>
-            <div className="link-svg-wrap">
-              {linkData ? (
-                <svg
-                  className="link-svg data-reveal"
-                  viewBox="0 0 400 370"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Edges — complete graph with WR + bond classification */}
-                  {linkData.edges.map((e, i) => {
-                    const p1 = linkData.positions[e.i1]
-                    const p2 = linkData.positions[e.i2]
-                    if (!p1 || !p2) return null
-                    const midX = (p1.x + p2.x) / 2
-                    const midY = (p1.y + p2.y) / 2
-                    return (
-                      <g key={`edge-${i}`}>
-                        <line
-                          x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                          stroke={e.stroke} strokeWidth={e.width}
-                          strokeDasharray={e.dashed ? '4,3' : 'none'}
-                          strokeOpacity={e.noData ? 0.3 : 0.75}
-                        />
-                        {!e.noData && (
-                          <>
-                            <rect x={midX - 18} y={midY - 9} width={36} height={16} rx={2}
-                              fill="var(--card)" stroke={e.stroke} strokeWidth={0.75} opacity={0.95} />
-                            <text x={midX} y={midY + 3} textAnchor="middle"
-                              fontFamily="Courier Prime, monospace" fontSize="9.5" fontWeight="700"
-                              fill={e.stroke}>
-                              {e.wr}%
-                            </text>
-                            {/* Bond classification label */}
-                            <text x={midX} y={midY + 20} textAnchor="middle"
-                              fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
-                              letterSpacing="1.5" fill={e.bond.color}>
-                              {e.bond.label}
-                            </text>
-                          </>
-                        )}
-                        {e.noData && (
-                          <text x={midX} y={midY + 4} textAnchor="middle"
-                            fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
-                            letterSpacing="1" fill="var(--muted-light)" opacity={0.5}>
-                            UNLINKED
-                          </text>
-                        )}
-                      </g>
-                    )
-                  })}
-
-                  {/* Active nodes — crosshair target markers */}
-                  {linkData.active.slice(0, linkData.n).map((op, i) => {
-                    const p = linkData.positions[i]
-                    if (!p) return null
-                    // Push label outward from center so it never overlaps edges
-                    const angle = Math.atan2(p.y - linkData.cy, p.x - linkData.cx)
-                    const labelDist = 26
-                    const lx = p.x + labelDist * Math.cos(angle)
-                    const ly = p.y + labelDist * Math.sin(angle)
-                    const dx = p.x - linkData.cx
-                    const anchor = dx > 15 ? 'start' : dx < -15 ? 'end' : 'middle'
-                    // For top-center nodes, nudge label upward; for bottom, downward
-                    const vertNudge = Math.abs(dx) <= 15 ? (p.y < linkData.cy ? -6 : 6) : 0
-                    return (
-                      <g key={op.puuid || i}>
-                        {/* Crosshair arms */}
-                        <line x1={p.x - 10} y1={p.y} x2={p.x - 4} y2={p.y} stroke="var(--text)" strokeWidth={0.75} />
-                        <line x1={p.x + 4} y1={p.y} x2={p.x + 10} y2={p.y} stroke="var(--text)" strokeWidth={0.75} />
-                        <line x1={p.x} y1={p.y - 10} x2={p.x} y2={p.y - 4} stroke="var(--text)" strokeWidth={0.75} />
-                        <line x1={p.x} y1={p.y + 4} x2={p.x} y2={p.y + 10} stroke="var(--text)" strokeWidth={0.75} />
-                        {/* Center dot */}
-                        <circle cx={p.x} cy={p.y} r={2.5} fill="var(--text)" />
-                        {/* Operator name — pushed outward from center */}
-                        <text x={lx} y={ly + vertNudge} textAnchor={anchor}
-                          fontFamily="IBM Plex Mono, monospace" fontSize="10" fontWeight="600"
-                          letterSpacing="1.2" fill="var(--text)">
-                          {op.name.toUpperCase()}
-                        </text>
-                        <text x={lx} y={ly + vertNudge + 12} textAnchor={anchor}
-                          fontFamily="IBM Plex Mono, monospace" fontSize="8" fontWeight="400"
-                          fill="var(--muted)">
-                          {op.games} OPS
-                        </text>
-                      </g>
-                    )
-                  })}
-
-                  {/* Inactive nodes — faded minimal markers */}
-                  {linkData.inactive.map((op, i) => {
-                    const p = linkData.inactivePositions[i]
-                    if (!p) return null
-                    return (
-                      <g key={`inactive-${op.puuid || i}`} opacity={0.35}>
-                        <line x1={p.x - 5} y1={p.y} x2={p.x + 5} y2={p.y} stroke="var(--muted)" strokeWidth={0.5} />
-                        <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 5} stroke="var(--muted)" strokeWidth={0.5} />
-                        <text x={p.x} y={p.y + 14} textAnchor="middle"
-                          fontFamily="IBM Plex Mono, monospace" fontSize="9" fontWeight="600"
-                          letterSpacing="1" fill="var(--muted)">
-                          {op.name.toUpperCase()}
-                        </text>
-                      </g>
-                    )
-                  })}
-                </svg>
-              ) : (
-                <div style={{
-                  width: 140, height: 140, borderRadius: '50%',
-                  border: '2px dashed var(--ink)', opacity: 0.5,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <R w={60} h={12} />
-                </div>
-              )}
-            </div>
-            <div className="link-legend">
-              <div className="legend-row">
-                <div className="legend-line" style={{ background: 'var(--green)' }} />
-                <span>CORE &mdash; HIGH WR, DEEP HISTORY</span>
-              </div>
-              <div className="legend-row">
-                <div className="legend-line" style={{ background: 'var(--muted)' }} />
-                <span>STABLE / VOLATILE &mdash; MIXED RECORD</span>
-              </div>
-              <div className="legend-row">
-                <div className="legend-line" style={{ background: 'var(--red)' }} />
-                <span>STRAINED &mdash; BELOW EXPECTATIONS</span>
-              </div>
-              <div className="legend-row">
-                <svg width="22" height="3" style={{ flexShrink: 0 }}>
-                  <line x1="0" y1="1.5" x2="22" y2="1.5" stroke="var(--muted-light)" strokeWidth="0.75" strokeDasharray="3,2" />
-                </svg>
-                <span>UNLINKED &mdash; NO JOINT OPS</span>
-              </div>
-              <div className="legend-row">
-                <span>LINE WEIGHT = DEPLOYMENT FREQUENCY</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ════════════════════════════

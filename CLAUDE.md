@@ -381,8 +381,10 @@ Main dashboard — ALL stats live here. Sections top-to-bottom:
    - 5-tier color scale: `>=62%` deep green, `>50%` medium green, `=50%` gray, `>=40%` medium red, `<40%` deep red
    - WR text color matches bar color
 4. **Two-column row:**
-   - **Duo Win Rates matrix** (left): NxN grid of pair WRs. Color-coded tiles:
-     red-bg `<48%`, amber-bg `48-54%`, green-bg `54-62%`, bright green-bg `>=62%`
+   - **Link Analysis** (left): SVG ring network graph of operators. Edge color =
+     pair WR, edge weight = joint match count. Hovering an operator fades all
+     unrelated edges/nodes and reveals per-pair pills (WR + shared games + bond
+     class); resting view is lines only. Inactive operators shown as orbit nodes.
    - **Activity Heatmap** (right): 7-day x 24-hour grid. Slate scale `h-0` through `h-5`
 5. **Champion Pools card:**
    - One row per active operator (alphabetical)
@@ -390,10 +392,8 @@ Main dashboard — ALL stats live here. Sections top-to-bottom:
    - Segmented bar showing pick distribution (monochrome scale `s-1` through `s-5`)
    - Terse bureaucratic profile observation note
 6. **Behavioral Intelligence section:**
-   - **Tilt Index** (left): threat level classification (e.g. `ELEVATED 7.2/10`),
+   - **Tilt Index** (full width): threat level classification (e.g. `ELEVATED 7.2/10`),
      10-segment scale, 5 key judgments, confidence stamp. Formula TBD.
-   - **Link Analysis** (right): SVG network graph of operators. Edge color = pair WR,
-     edge weight = joint match count. Inactive operators shown as orbit nodes.
 7. **Analyst Observations (Field Assessments):**
    - 6 cards in 2-column grid
    - Each: severity stripe (green/red/amber/blue/black), code (`OBS-NN`), title,
@@ -505,10 +505,10 @@ Build only these features in V1. Do not add scope.
 4. **Briefing** — Full dashboard with ALL sections:
    - Cell Members (summary strip + operator table)
    - Game Mode Breakdown (horizontal bars, 5-tier color scale)
-   - Duo Win Rates matrix (NxN pair grid)
+   - Link Analysis (ring network graph of pair WRs; hover to isolate an operator)
    - Activity Heatmap (7-day x 24-hour)
    - Champion Pools (per-operator distribution bars + class badges)
-   - Behavioral Intelligence (Tilt Index + Link Analysis graph)
+   - Behavioral Intelligence (Tilt Index, full width)
    - Analyst Observations (6 field assessment cards)
 5. **Operation Log** — Joint match history with theater/outcome/operator filters
 6. **Cell switcher** — Header dropdown to switch between cells

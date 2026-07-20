@@ -75,8 +75,8 @@ export default function Landing() {
             <div className="feature-title">Cell intelligence summary</div>
             <p className="feature-desc">
               Joint WR vs. the counterfactual baseline. Operator roster with
-              per-subject subtraction analysis. Champion pools. Pair-level WR
-              matrix. Tilt index and post-loss cohesion decay. Behavioral
+              per-subject subtraction analysis. Champion pools. Pair-level
+              link analysis. Tilt index and post-loss cohesion decay. Behavioral
               observations filed by mode and time of day.
             </p>
           </div>

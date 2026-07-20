@@ -1799,10 +1799,7 @@ footer.site-footer {
 }
 
 /* ── Analyst row (Tilt + Link Analysis) ── */
-.analyst-row {
-  display: grid; grid-template-columns: 1.45fr 1fr;
-  gap: 16px; margin-bottom: 16px;
-}
+.analyst-solo { margin-bottom: 16px; }
 
 /* ── Tilt Index (mockup-style) ── */
 .tilt-measuring {
@@ -1868,22 +1865,15 @@ footer.site-footer {
   border: 1px solid var(--amber); color: var(--amber); font-weight: 600;
 }
 /* ── Link Analysis panel ── */
-.link-panel { padding: 22px 24px; display: flex; flex-direction: column; }
 .link-svg-wrap {
-  margin-top: 14px; flex: 1;
+  margin-top: 8px; flex: 1;
+  position: relative; min-height: 340px;
   display: flex; align-items: center; justify-content: center;
 }
-.link-svg { width: 100%; height: auto; display: block; max-width: 400px; }
-.link-legend {
-  display: grid; grid-template-columns: 1fr;
-  gap: 8px;
-  padding-top: 14px; margin-top: 14px;
-  border-top: 1px dashed var(--border-light);
-  font-family: var(--font-mono);
-  font-size: 10px; letter-spacing: 1.5px; color: var(--muted);
-}
-.legend-row { display: flex; align-items: center; gap: 9px; }
-.legend-line { width: 22px; height: 3px; }
+/* Absolute fill: the SVG adopts the wrap's size (scaled to fit, centred)
+   instead of dictating it */
+.link-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.link-svg .link-el { transition: opacity 0.18s ease; }
 
 /* ── Field Assessments (mockup-style) ── */
 .analyst-bottom { margin-bottom: 28px; }
@@ -1957,38 +1947,7 @@ footer.site-footer {
   vertical-align: middle; display: inline-block; margin-left: 4px;
 }
 .recruit-btn:hover { opacity: 0.88; }
-/* Matrix (Duo WR grid) */
-.matrix-grid {
-  display: grid; gap: 3px; width: 100%;
-  min-height: 280px;
-}
-.matrix-label {
-  font-family: var(--font-mono);
-  font-size: 10px; letter-spacing: 1px; color: var(--muted);
-  display: flex; align-items: center; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; padding-right: 4px;
-}
-.matrix-label-top {
-  font-family: var(--font-mono);
-  font-size: 10px; letter-spacing: 1px; color: var(--muted); text-align: center;
-  writing-mode: vertical-rl; transform: rotate(180deg);
-  display: flex; align-items: center; justify-content: center;
-}
-.matrix-cell {
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-stat); font-size: 12px; font-weight: 700;
-  position: relative; cursor: default; border-radius: 3px; min-height: 24px;
-}
-.matrix-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; z-index: 5; }
-.matrix-cell:hover::after {
-  content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px);
-  left: 50%; transform: translateX(-50%); background: var(--surface-dark);
-  color: var(--text-inverse); font-size: 10px; padding: 6px 10px; white-space: nowrap;
-  z-index: 20; font-weight: 400; letter-spacing: 0; border-radius: 4px;
-  font-family: var(--font-mono);
-}
-.matrix-self { background: var(--surface); color: var(--muted); font-size: 11px; }
-.matrix-empty { background: var(--surface); color: transparent; }
+/* WR tint classes (shared by mode bars and other WR-coded surfaces) */
 .wr-low   { background: var(--red-bg);   color: var(--red-dark); }
 .wr-mid   { background: var(--amber-bg); color: var(--amber-dark); }
 .wr-high  { background: var(--green-bg); color: var(--green-dark); }
@@ -2467,7 +2426,6 @@ footer.site-footer {
   .dashboard, .page-content { padding: 20px 20px 60px; }
   .cm-summary { grid-template-columns: repeat(2, 1fr); }
   .two-col { grid-template-columns: 1fr; }
-  .analyst-row { grid-template-columns: 1fr; }
   .assessment-list { grid-template-columns: 1fr; }
 }
 
