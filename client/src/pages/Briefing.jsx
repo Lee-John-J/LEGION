@@ -813,7 +813,7 @@ export default function Briefing() {
                       const vertNudge = Math.abs(dx) <= 15 ? (p.y < linkData.cy ? -6 : 6) : 0
                       const nodeDim = hoverOp !== null && hoverOp !== i
                       return (
-                        <g key={op.puuid || i} className="link-el" opacity={nodeDim ? 0.18 : 1}
+                        <g key={op.puuid || i} className="link-el" opacity={nodeDim ? 0.5 : 1}
                           onMouseEnter={() => setHoverOp(i)}
                           onMouseLeave={() => setHoverOp(null)}>
                           {/* Invisible hit area so the hover target is generous */}
@@ -846,7 +846,7 @@ export default function Briefing() {
                       if (!p) return null
                       return (
                         <g key={`inactive-${op.puuid || i}`} className="link-el"
-                          opacity={hoverOp !== null ? 0.12 : 0.35}>
+                          opacity={hoverOp !== null ? 0.2 : 0.35}>
                           <line x1={p.x - 5} y1={p.y} x2={p.x + 5} y2={p.y} stroke="var(--muted)" strokeWidth={0.5} />
                           <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 5} stroke="var(--muted)" strokeWidth={0.5} />
                           <text x={p.x} y={p.y + 14} textAnchor="middle"
