@@ -757,25 +757,25 @@ export default function Briefing() {
                           {!e.noData && (
                             <>
                               <rect
-                                x={midX - (isHot ? 27 : 18)} y={midY - (isHot ? 14 : 9)}
-                                width={isHot ? 54 : 36} height={isHot ? 28 : 16} rx={2}
+                                x={midX - (isHot ? 33 : 18)} y={midY - (isHot ? 17 : 9)}
+                                width={isHot ? 66 : 36} height={isHot ? 34 : 16} rx={2}
                                 fill="var(--card)" stroke={e.stroke}
                                 strokeWidth={isHot ? 1 : 0.75} opacity={0.95} />
-                              <text x={midX} y={midY + (isHot ? -2 : 3)} textAnchor="middle"
+                              <text x={midX} y={midY + (isHot ? -3 : 3)} textAnchor="middle"
                                 fontFamily="Courier Prime, monospace"
-                                fontSize={isHot ? 11.5 : 9.5}
+                                fontSize={isHot ? 15 : 9.5}
                                 fontWeight="700" fill={e.stroke}>
                                 {e.wr}%
                               </text>
                               {isHot && (
                                 <>
-                                  <text x={midX} y={midY + 9} textAnchor="middle"
-                                    fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                                  <text x={midX} y={midY + 11} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
                                     letterSpacing="1" fill="var(--muted)">
                                     {e.games} OPS
                                   </text>
-                                  <text x={midX} y={midY + 26} textAnchor="middle"
-                                    fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                                  <text x={midX} y={midY + 31} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
                                     letterSpacing="1.5" fill={e.bond.color}>
                                     {e.bond.label}
                                   </text>
@@ -785,7 +785,7 @@ export default function Briefing() {
                           )}
                           {e.noData && isHot && (
                             <text x={midX} y={midY + 4} textAnchor="middle"
-                              fontFamily="IBM Plex Mono, monospace" fontSize="7" fontWeight="600"
+                              fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
                               letterSpacing="1" fill="var(--muted-light)" opacity={0.5}>
                               UNLINKED
                             </text>
@@ -877,7 +877,7 @@ export default function Briefing() {
             <div className="panel-subtitle">When the cell deploys together{heatmapData ? ` — ${heatmapData.tzAbbr}` : ''}</div>
             <div className="panel-body">
               {heatmapData ? (
-                <div className="data-reveal">
+                <div className="data-reveal heatmap-stack">
                   <div className="heatmap-grid">
                     {heatmapData.DAYS.flatMap((day, di) => [
                         <div key={`day-label-${di}`} className="heatmap-day-label">{day}</div>,
