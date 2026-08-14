@@ -53,6 +53,31 @@ function theaterEntry(games, wins, champs) {
   }
 }
 
+// ── Campaign Record timeline ──
+// A season of joint deployments played in bursts with idle gaps between them.
+// Deterministic (seeded) so the chart looks the same on every refresh.
+function buildMockTimeline() {
+  const weekGames = [6, 0, 0, 10, 0, 0, 0, 18, 22, 0, 3, 0, 0, 8, 14, 0, 0, 0, 9, 12, 0, 0, 0, 7]
+  const weekBias = [0.05, 0, 0, 0.03, 0, 0, 0, -0.15, -0.12, 0, 0, 0, 0, 0.12, 0.14, 0, 0, 0, 0.04, 0.06, 0, 0, 0, 0.05]
+  const timeline = []
+  let seed = 11
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+  let momentum = 0
+  const WEEK = 7 * 86400000
+  const seasonStart = Date.now() - weekGames.length * WEEK
+  weekGames.forEach((count, w) => {
+    for (let k = 0; k < count; k++) {
+      const p = Math.min(0.8, Math.max(0.2, 0.5 + momentum + weekBias[w]))
+      const win = rnd() < p
+      momentum = win ? 0.13 : -0.13
+      // Spread each week's games across a couple of evening sessions
+      const ts = seasonStart + w * WEEK + Math.floor(k / 4) * 2 * 86400000 + 20 * 3600000 + (k % 4) * 40 * 60000
+      timeline.push({ ts, win })
+    }
+  })
+  return timeline
+}
+
 export const MOCK_STATS = {
   total_games: 142,
   games_together: 87,
@@ -60,6 +85,7 @@ export const MOCK_STATS = {
   win_rate_together: 0.529,
   win_rate_apart: 0.472,
   season_year: 2026,
+  timeline: buildMockTimeline(),
 
   // ── Operator stats ──
   operator_stats: [

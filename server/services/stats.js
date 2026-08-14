@@ -379,6 +379,19 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     return (a.info?.gameEndTimestamp ?? 0) - (b.info?.gameEndTimestamp ?? 0)
   })
 
+  // ── Campaign Record timeline — every joint deployment in order ──
+  // The client draws the season trend chart from this; ts is the game-end
+  // epoch millis so the client can detect idle gaps and month boundaries.
+  const timeline = chronological
+    .map((m) => {
+      const cellTeam = getSameTeamCellGroup(m.info?.participants ?? [], puuidSet)
+      return {
+        ts: m.info?.gameEndTimestamp ?? m.info?.gameStartTimestamp ?? null,
+        win: cellTeam ? !!cellTeam[0].win : false,
+      }
+    })
+    .filter((g) => g.ts != null)
+
   let tilt_index = null
   if (chronological.length >= 5) {
     const results = chronological.map((m) => {
@@ -882,6 +895,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     duo_stats,
     heatmap,
     recent_form,
+    timeline,
     tilt_index,
     assessments,
   }

@@ -470,25 +470,32 @@
       border: 1px solid var(--amber); color: var(--amber); font-weight: 600;
     }
 
-    /* ── LINK ANALYSIS (vertical) ── */
-    .link-panel { padding: 22px 24px; display: flex; flex-direction: column; }
+    /* ── LINK ANALYSIS (mirrors client/src/index.css) ── */
     .link-svg-wrap {
-      margin-top: 14px; flex: 1;
+      margin-top: 8px; flex: 1;
+      position: relative; min-height: 340px;
       display: flex; align-items: center; justify-content: center;
     }
-    .link-svg { width: 100%; height: auto; display: block; max-width: 360px; }
-    .link-legend {
-      display: grid; grid-template-columns: 1fr;
-      gap: 8px;
-      padding-top: 14px; margin-top: 14px;
-      border-top: 1px dashed var(--border-light);
+    .link-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .link-svg .link-el { transition: opacity 0.18s ease; }
+
+    /* ── MODE ADVISORY (mirrors client/src/index.css) ── */
+    .mode-advisory {
       font-family: var(--font-mono);
-      font-size: 10px; letter-spacing: 1.5px; color: var(--muted);
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--muted-light);
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-light);
+      letter-spacing: 0.3px;
     }
-    .legend-row { display: flex; align-items: center; gap: 9px; }
-    .legend-line { width: 22px; height: 3px; }
-    .legend-node { width: 10px; height: 10px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
-    .legend-node.node-isolated { background: var(--text); border: 2px dashed var(--border); }
+    .advisory-marker {
+      color: var(--amber);
+      font-size: 7px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
 
     /* ── CHAMPION POOLS (FULL WIDTH, grid) ── */
     .pools-card { margin-bottom: 16px; }
@@ -943,15 +950,25 @@
           <div class="mode-games">4 games</div>
         </div>
       </div>
+
+      <div class="mode-advisory">
+        <span class="advisory-marker">&#9632;</span>
+        ARAM: Mayhem match data is withheld from Riot API by directive.
+        Field records for this theater are not available for external analysis.
+        Matches played in this mode will not appear in LEGION reporting
+        until the restriction is lifted.
+      </div>
     </div>
 
-    <!-- ══ DUO MATRIX + HEATMAP ══ -->
+    <!-- ══ LINK ANALYSIS + HEATMAP ══ -->
     <div class="two-col">
       <div class="card vis-panel">
-        <div class="panel-title">Duo Win Rates</div>
-        <div class="panel-subtitle">Win rate when any two operators deploy together</div>
+        <div class="panel-title">Link Analysis</div>
+        <div class="panel-subtitle">Joint win rate by operator pair. Hover an operator to isolate their links.</div>
         <div class="panel-body">
-          <div class="matrix-grid" id="synergyMatrix"></div>
+          <div class="link-svg-wrap">
+            <svg id="linkSvg" class="link-svg" viewBox="0 0 400 370" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
         </div>
       </div>
       <div class="card vis-panel">
@@ -960,6 +977,25 @@
         <div class="panel-body">
           <div class="heatmap-grid" id="heatmap"></div>
           <div class="heatmap-hour-labels" id="hourLabels"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CAMPAIGN RECORD (FULL WIDTH) ══ -->
+    <div class="card fun-card">
+      <div class="fun-label">&bull; Trend Analysis</div>
+      <div class="fun-title">Campaign Record</div>
+      <div class="fun-subtitle">Rolling 20-game win rate across the season</div>
+      <div class="fun-body">
+        <div style="position:relative;">
+          <svg id="crSvg" viewBox="0 0 680 228" width="100%" role="img" aria-label="Rolling win rate line across the season; hatched bands mark idle stretches between bursts of play"><title>Campaign record</title><defs><pattern id="crDk" width="5" height="5" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="5" stroke="#c9c2af" stroke-width="1.4"/></pattern></defs><rect x="71" y="12" width="20.4" height="184" fill="url(#crDk)" opacity="0.55"/><rect x="137.1" y="12" width="28.4" height="184" fill="url(#crDk)" opacity="0.55"/><rect x="343.4" y="12" width="12.4" height="184" fill="url(#crDk)" opacity="0.55"/><rect x="370.6" y="12" width="20.4" height="184" fill="url(#crDk)" opacity="0.55"/><rect x="489.6" y="12" width="28.4" height="184" fill="url(#crDk)" opacity="0.55"/><rect x="612.1" y="12" width="28.5" height="184" fill="url(#crDk)" opacity="0.55"/><line x1="44" y1="176" x2="670" y2="176" stroke="#e5dfd0" stroke-width="1"/><text x="40" y="179" text-anchor="end" font-size="9" fill="#9a9388" font-family="'Courier Prime',monospace">0%</text><line x1="44" y1="136" x2="670" y2="136" stroke="#e5dfd0" stroke-width="1"/><text x="40" y="139" text-anchor="end" font-size="9" fill="#9a9388" font-family="'Courier Prime',monospace">25%</text><line x1="44" y1="56" x2="670" y2="56" stroke="#e5dfd0" stroke-width="1"/><text x="40" y="59" text-anchor="end" font-size="9" fill="#9a9388" font-family="'Courier Prime',monospace">75%</text><line x1="44" y1="16" x2="670" y2="16" stroke="#e5dfd0" stroke-width="1"/><text x="40" y="19" text-anchor="end" font-size="9" fill="#9a9388" font-family="'Courier Prime',monospace">100%</text><line x1="44" y1="96" x2="670" y2="96" stroke="#a8a194" stroke-width="1" stroke-dasharray="4 4"/><text x="40" y="99" text-anchor="end" font-size="9" fill="#6b6558" font-family="'Courier Prime',monospace">50%</text><line x1="151.3" y1="12" x2="151.3" y2="198" stroke="#e5dfd0" stroke-width="1"/><line x1="245.7" y1="12" x2="245.7" y2="198" stroke="#e5dfd0" stroke-width="1"/><line x1="380.8" y1="12" x2="380.8" y2="198" stroke="#e5dfd0" stroke-width="1"/><line x1="503.8" y1="12" x2="503.8" y2="198" stroke="#e5dfd0" stroke-width="1"/><line x1="626.4" y1="12" x2="626.4" y2="198" stroke="#e5dfd0" stroke-width="1"/><text x="90.0" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">JAN</text><text x="205.9" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">FEB</text><text x="307.8" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">MAR</text><text x="440.3" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">APR</text><text x="565.0" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">MAY</text><text x="656.8" y="216" text-anchor="middle" font-size="9" letter-spacing="2" fill="#6b6558" font-family="'Courier Prime',monospace">JUN</text><path d="M46,16 L50.4,16 L54.8,16 L59.2,16 L63.6,48 L68,68.8 M94.4,62.4 L98.9,75.2 L103.3,68.8 L107.7,64 L112.1,73.6 L116.5,68.8 L120.9,65.6 L125.3,62.4 L129.7,59.2 L134.1,56 M168.5,54.4 L172.9,51.2 L177.3,57.6 L181.7,64 L186.1,64 L190.6,72 L195,80 L199.4,80 L203.8,72 L208.2,64 L212.6,72 L217,64 L221.4,64 L225.8,72 L230.2,72 L234.6,80 L239,88 L243.4,88 L247.9,88 L252.3,96 L256.7,96 L261.1,96 L265.5,96 L269.9,88 L274.3,88 L278.7,88 L283.1,88 L287.5,96 L291.9,104 L296.3,104 L300.7,96 L305.1,104 L309.6,112 L314,112 L318.4,112 L322.8,112 L327.2,112 L331.6,112 L336,120 L340.4,112 M358.8,112 L363.2,120 L367.6,120 M394,128 L398.4,128 L402.9,128 L407.3,120 L411.7,112 L416.1,104 L420.5,104 L424.9,104 L429.3,96 L433.7,88 L438.1,80 L442.5,72 L446.9,64 L451.3,56 L455.7,56 L460.1,48 L464.6,48 L469,48 L473.4,40 L477.8,40 L482.2,32 L486.6,32 M521,24 L525.4,32 L529.8,32 L534.2,32 L538.6,40 L543,48 L547.4,56 L551.9,64 L556.3,64 L560.7,64 L565.1,64 L569.5,64 L573.9,64 L578.3,72 L582.7,80 L587.1,88 L591.5,96 L595.9,96 L600.3,96 L604.7,96 L609.1,96 M643.6,88 L648,96 L652.4,96 L656.8,88 L661.2,80 L665.6,72 L670,64" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M46 186v10M50.4 186v10M54.8 186v10M59.2 186v10M94.4 186v10M103.3 186v10M107.7 186v10M116.5 186v10M120.9 186v10M125.3 186v10M129.7 186v10M134.1 186v10M168.5 186v10M172.9 186v10M186.1 186v10M199.4 186v10M203.8 186v10M208.2 186v10M217 186v10M221.4 186v10M243.4 186v10M247.9 186v10M256.7 186v10M261.1 186v10M269.9 186v10M274.3 186v10M296.3 186v10M300.7 186v10M331.6 186v10M340.4 186v10M358.8 186v10M398.4 186v10M407.3 186v10M411.7 186v10M416.1 186v10M420.5 186v10M424.9 186v10M429.3 186v10M433.7 186v10M438.1 186v10M442.5 186v10M446.9 186v10M451.3 186v10M455.7 186v10M460.1 186v10M464.6 186v10M469 186v10M473.4 186v10M482.2 186v10M486.6 186v10M521 186v10M529.8 186v10M534.2 186v10M556.3 186v10M560.7 186v10M565.1 186v10M569.5 186v10M573.9 186v10M600.3 186v10M604.7 186v10M609.1 186v10M643.6 186v10M652.4 186v10M656.8 186v10M661.2 186v10M665.6 186v10M670 186v10" stroke="#15803d" stroke-width="2.2" fill="none"/><path d="M63.6 186v10M68 186v10M98.9 186v10M112.1 186v10M177.3 186v10M181.7 186v10M190.6 186v10M195 186v10M212.6 186v10M225.8 186v10M230.2 186v10M234.6 186v10M239 186v10M252.3 186v10M265.5 186v10M278.7 186v10M283.1 186v10M287.5 186v10M291.9 186v10M305.1 186v10M309.6 186v10M314 186v10M318.4 186v10M322.8 186v10M327.2 186v10M336 186v10M363.2 186v10M367.6 186v10M394 186v10M402.9 186v10M477.8 186v10M525.4 186v10M538.6 186v10M543 186v10M547.4 186v10M551.9 186v10M578.3 186v10M582.7 186v10M587.1 186v10M591.5 186v10M595.9 186v10M648 186v10" stroke="#b91c1c" stroke-width="2.2" fill="none"/><circle cx="327.2" cy="112" r="5" fill="none" stroke="var(--red)" stroke-width="1.5"/><text x="327.2" y="100" text-anchor="middle" font-size="9" letter-spacing="1" fill="var(--red)" stroke="var(--card)" stroke-width="3.5" paint-order="stroke" font-family="'Courier Prime',monospace">6L SLUMP</text><circle cx="473.4" cy="40" r="5" fill="none" stroke="#15803d" stroke-width="1.5"/><text x="473.4" y="58" text-anchor="middle" font-size="9" letter-spacing="1" fill="#15803d" stroke="var(--card)" stroke-width="3.5" paint-order="stroke" font-family="'Courier Prime',monospace">16W RUN</text><line id="crHl" x1="0" y1="12" x2="0" y2="198" stroke="var(--text)" stroke-width="1" stroke-dasharray="3 3" opacity="0"/></svg>
+          <div id="crTip" style="position:absolute; top:6px; display:none; background:var(--surface-dark); color:var(--text-inverse); font-size:10px; line-height:1.6; padding:6px 9px; border-radius:4px; pointer-events:none; white-space:nowrap; letter-spacing:0.5px; font-family:var(--font-mono);"></div>
+        </div>
+        <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:9px; font-family:var(--font-mono); font-size:10px; color:var(--muted); letter-spacing:1px; display:flex; gap:18px; flex-wrap:wrap;">
+          <span>RECORDS:</span>
+          <span>BEST RUN <strong style="color:var(--green);">16W</strong> (APR 13)</span>
+          <span>WORST SLUMP <strong style="color:var(--red);">6L</strong> (MAR 02)</span>
+          <span>PEAK VOLUME <strong>22/WK</strong> (MAR 02)</span>
         </div>
       </div>
     </div>
@@ -1086,119 +1122,6 @@
       <div class="section-subtitle">Performance anomalies, synergies, and deployment patterns</div>
     </div>
 
-    <!-- TILT + LINK ANALYSIS (side by side) -->
-    <div class="analyst-row">
-
-      <!-- TILT INDEX (wider left) -->
-      <div class="card fun-card">
-        <div class="fun-label">&bull; Behavioral Assessment</div>
-        <div class="fun-title">Tilt Index</div>
-        <div class="fun-body">
-
-          <div class="tilt-measuring">
-            <div class="tilt-measuring-label">WHAT WE'RE MEASURING</div>
-            <div class="tilt-measuring-text">
-              Post-loss cohesion decay across consecutive-loss sequences. Scale 0&ndash;10. Higher = worse.
-            </div>
-          </div>
-
-          <div class="tilt-class-head">
-            <div class="tilt-class-label">THREAT LEVEL</div>
-            <div class="tilt-class-value">ELEVATED</div>
-            <div class="tilt-class-score">7.2 / 10</div>
-          </div>
-          <div class="tilt-segments">
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg on-amber"></div>
-            <div class="tilt-seg"></div>
-            <div class="tilt-seg"></div>
-            <div class="tilt-seg"></div>
-          </div>
-
-          <div class="judgments-head">KEY JUDGMENTS</div>
-          <div class="judgment"><strong>Init. Vector</strong> &mdash; Subject <em>Pin Pon</em> initiates cascade in 84% of observed incidents. Coincident with Master Yi pick in game two.</div>
-          <div class="judgment"><strong>Cascade</strong> &mdash; Cell-wide morale collapse: 47s after queue re-entry, mean.</div>
-          <div class="judgment"><strong>Output</strong> &mdash; Subsequent match WR: 41.2% (&minus;17.1 points from baseline).</div>
-          <div class="judgment"><strong>Recovery</strong> &mdash; 3.4 additional games to restore baseline. Queue-dodging does not shorten window.</div>
-          <div class="judgment"><strong>Resistance</strong> &mdash; Subject <em>iHazACatz</em> demonstrates composure under cascade. Mechanism undetermined.</div>
-
-          <div class="confidence-stamp">CONFIDENCE: HIGH &middot; N=147</div>
-        </div>
-      </div>
-
-      <!-- LINK ANALYSIS (narrower right, vertical) -->
-      <div class="card fun-card link-panel">
-        <div class="fun-label">&bull; Network Intelligence</div>
-        <div class="fun-title">Link Analysis</div>
-        <div class="link-svg-wrap">
-          <svg class="link-svg" viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg">
-            <!--
-              Pentagonal layout — 5 active operators at vertices (alphabetical,
-              clockwise from top: CAT, JIM, LYU, PIN, SDS). Two inactive
-              orbit nodes (AFK, TAC) outside the perimeter.
-              edge color = pair WR; edge weight = joint games
-            -->
-
-            <!-- ── EDGES (pentagon all-pairs C(5,2) = 10 edges) ── -->
-            <!-- CAT ↔ JIM : 71.2% / 48 — STRONG -->
-            <line x1="180" y1="80"  x2="305" y2="170" stroke="#15803d" stroke-width="5.2" stroke-opacity="0.78"/>
-            <!-- CAT ↔ LYU : 53.3% / 15 — neutral -->
-            <line x1="180" y1="80"  x2="260" y2="370" stroke="#8a8a8a" stroke-width="2.0" stroke-opacity="0.4"/>
-            <!-- CAT ↔ PIN : 44.1% / 6 — LOW -->
-            <line x1="180" y1="80"  x2="100" y2="370" stroke="#b91c1c" stroke-width="1.4" stroke-opacity="0.55"/>
-            <!-- CAT ↔ SDS : 49.7% / 19 — neutral -->
-            <line x1="180" y1="80"  x2="55"  y2="170" stroke="#8a8a8a" stroke-width="2.2" stroke-opacity="0.38"/>
-            <!-- JIM ↔ LYU : 56.8% / 31 — neutral -->
-            <line x1="305" y1="170" x2="260" y2="370" stroke="#8a8a8a" stroke-width="3.0" stroke-opacity="0.45"/>
-            <!-- JIM ↔ PIN : 48.3% / 8 — weak -->
-            <line x1="305" y1="170" x2="100" y2="370" stroke="#8a8a8a" stroke-width="1.4" stroke-opacity="0.35"/>
-            <!-- JIM ↔ SDS : 54.1% / 22 — neutral -->
-            <line x1="305" y1="170" x2="55"  y2="170" stroke="#8a8a8a" stroke-width="2.4" stroke-opacity="0.4"/>
-            <!-- LYU ↔ PIN : 46.2% / 9 — weak -->
-            <line x1="260" y1="370" x2="100" y2="370" stroke="#8a8a8a" stroke-width="1.4" stroke-opacity="0.35"/>
-            <!-- LYU ↔ SDS : 64.7% / 18 — STRONG -->
-            <line x1="260" y1="370" x2="55"  y2="170" stroke="#15803d" stroke-width="3.2" stroke-opacity="0.7"/>
-            <!-- PIN ↔ SDS : 42.8% / 7 — LOW -->
-            <line x1="100" y1="370" x2="55"  y2="170" stroke="#b91c1c" stroke-width="1.6" stroke-opacity="0.55"/>
-
-            <!-- ── NODES (5 active, alphabetical clockwise from top) ── -->
-            <circle cx="180" cy="80"  r="10" fill="#1a1a1a"/>
-            <text x="180" y="58" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="#1a1a1a" letter-spacing="1.5">CAT</text>
-
-            <circle cx="305" cy="170" r="10" fill="#1a1a1a"/>
-            <text x="320" y="174" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="#1a1a1a" letter-spacing="1.5">JIM</text>
-
-            <circle cx="260" cy="370" r="10" fill="#1a1a1a"/>
-            <text x="276" y="374" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="#1a1a1a" letter-spacing="1.5">LYU</text>
-
-            <circle cx="100" cy="370" r="10" fill="#1a1a1a"/>
-            <text x="84" y="374" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="#1a1a1a" letter-spacing="1.5">PIN</text>
-
-            <circle cx="55"  cy="170" r="10" fill="#1a1a1a"/>
-            <text x="40" y="174" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="#1a1a1a" letter-spacing="1.5">SDS</text>
-
-            <!-- ── INACTIVE / ORBIT (no edges visible) — alphabetical: AFK, TAC ── -->
-            <circle cx="35"  cy="50" r="6" fill="#1a1a1a" stroke="#d4ccb8" stroke-width="2" stroke-dasharray="2,2"/>
-            <text x="48" y="54" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="700" fill="#6b6558" letter-spacing="1.5">AFK</text>
-
-            <circle cx="325" cy="450" r="6" fill="#1a1a1a" stroke="#d4ccb8" stroke-width="2" stroke-dasharray="2,2"/>
-            <text x="312" y="454" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="700" fill="#6b6558" letter-spacing="1.5">TAC</text>
-          </svg>
-        </div>
-        <div class="link-legend">
-          <div class="legend-row"><div class="legend-line" style="background:var(--green);"></div><span>HIGH WR PAIRING</span></div>
-          <div class="legend-row"><div class="legend-line" style="background:var(--red);"></div><span>LOW WR PAIRING</span></div>
-          <div class="legend-row"><div class="legend-node node-isolated"></div><span>NO JOINT OPS</span></div>
-          <div class="legend-row"><span>LINE WEIGHT = JOINT GAMES</span></div>
-        </div>
-      </div>
-    </div>
-
     <!-- ══ FIELD ASSESSMENTS ══ -->
     <div class="analyst-bottom">
       <div class="card fun-card">
@@ -1306,7 +1229,7 @@
   <footer class="site-footer">DOCUMENT REF: LGN-2026-BRIEF-<span class="redacted-inline" style="height:8px; width:24px;"></span> &nbsp;//&nbsp; ORIGINATING OFFICE: LEGION/OPS &nbsp;//&nbsp; CASE: ZOO 2 &nbsp;//&nbsp; OVERSIGHT: <span class="redacted-inline" style="height:8px; width:38px;"></span> &nbsp;//&nbsp; DISTRIBUTION LIMITED &nbsp;//&nbsp; DECLASSIFY ON: CELL DISBANDMENT</footer>
 
   <script>
-    /* ── DUO WIN RATES MATRIX ── alphabetical operator order ── */
+    /* ── OPERATOR PAIR DATA ── alphabetical order; first 5 active, last 2 inactive ── */
     const members = ['iHazACatz','jimmmaaayyy','lyu','Pin Pon','sdsOmega','The Afk King','UnfoldedTaco'];
     const codes   = ['CAT','JIM','LYU','PIN','SDS','AFK','TAC'];
     const wr = [
@@ -1329,28 +1252,120 @@
       [10, 12,  7,  2,  6,  0,  2], // AFK
       [ 5,  6,  4,  1,  3,  2,  0], // TAC
     ];
-    function cls(v, n){
-      if(v===null) return 'matrix-self';
-      if(n < 5) return 'matrix-empty';
-      if(v<48) return 'wr-low';
-      if(v<54) return 'wr-mid';
-      if(v<62) return 'wr-high';
-      return 'wr-great';
+    /* ── LINK ANALYSIS ── mirrors buildLinkSVG() + render in client/src/pages/Briefing.jsx ── */
+    const opGames = [62, 71, 55, 24, 47]; // 30d games for the 5 active operators
+    const N = 5, LCX = 200, LCY = 175, LR = 125;
+    function linkEdgeColor(p){ if(p>=62) return 'var(--green)'; if(p>50) return '#16a34a'; if(p>=40) return 'var(--red-mid)'; return 'var(--red)'; }
+    function classifyBond(games, p){
+      if(games===0) return {label:'UNLINKED', color:'var(--muted-light)'};
+      if(games<5)   return {label:'EMERGING', color:'var(--muted)'};
+      if(p>=58 && games>=15) return {label:'CORE', color:'var(--green)'};
+      if(p>=50) return {label:'STABLE', color:'var(--muted)'};
+      if(p>=42) return {label:'VOLATILE', color:'var(--amber)'};
+      return {label:'STRAINED', color:'var(--red)'};
     }
-    const mx = document.getElementById('synergyMatrix');
-    mx.appendChild(document.createElement('div'));
-    codes.forEach(c => { const d = document.createElement('div'); d.className='matrix-label-top'; d.textContent=c; mx.appendChild(d); });
-    members.forEach((rn, ri) => {
-      const rl = document.createElement('div'); rl.className='matrix-label'; rl.textContent = codes[ri]; mx.appendChild(rl);
-      members.forEach((cn, ci) => {
-        const c = document.createElement('div');
-        c.className = `matrix-cell ${cls(wr[ri][ci], gm[ri][ci])}`;
-        if(ri === ci) { c.textContent = '—'; }
-        else if(gm[ri][ci] < 5) { c.textContent = ''; c.setAttribute('data-tooltip', `${rn} + ${cn}: insufficient data (${gm[ri][ci]} games)`); }
-        else { c.textContent = wr[ri][ci].toFixed(0)+'%'; c.setAttribute('data-tooltip', `${rn} + ${cn}: ${wr[ri][ci]}% over ${gm[ri][ci]} games`); }
-        mx.appendChild(c);
+    const linkEdges = [];
+    let linkMaxGames = 1;
+    for(let i=0;i<N;i++) for(let j=i+1;j<N;j++) linkMaxGames = Math.max(linkMaxGames, gm[i][j]);
+    for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
+      const games = gm[i][j], wrRound = Math.round(wr[i][j]);
+      linkEdges.push({
+        i1:i, i2:j, wr:wrRound, games,
+        stroke: wrRound===50 ? 'var(--muted)' : linkEdgeColor(wr[i][j]),
+        width: 1 + (games/linkMaxGames)*2.5,
+        dashed: games < 10,
+        bond: classifyBond(games, wrRound),
       });
+    }
+    const linkPos = [];
+    for(let i=0;i<N;i++){
+      const a = (2*Math.PI*i)/N - Math.PI/2;
+      linkPos.push({x: LCX + LR*Math.cos(a), y: LCY + LR*Math.sin(a)});
+    }
+    const linkInactive = [members[5], members[6]];
+    const linkInactivePos = linkInactive.map((_, i) => {
+      const a = (2*Math.PI*i)/Math.max(linkInactive.length,1) + Math.PI/6;
+      return {x: LCX + (LR+45)*Math.cos(a), y: LCY + (LR+45)*Math.sin(a)};
     });
+    const linkSvg = document.getElementById('linkSvg');
+    function lEl(tag, attrs, parent){
+      const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for(const k in attrs) e.setAttribute(k, attrs[k]);
+      (parent || linkSvg).appendChild(e);
+      return e;
+    }
+    function lText(x, y, str, attrs, parent){
+      const t = lEl('text', Object.assign({x, y}, attrs), parent);
+      t.textContent = str;
+      return t;
+    }
+    function renderLink(hoverOp){
+      while(linkSvg.firstChild) linkSvg.removeChild(linkSvg.firstChild);
+      const hovering = hoverOp !== null;
+      linkEdges.forEach(e => {
+        const p1 = linkPos[e.i1], p2 = linkPos[e.i2];
+        const midX = (p1.x+p2.x)/2, midY = (p1.y+p2.y)/2;
+        const isHot = hovering && (e.i1===hoverOp || e.i2===hoverOp);
+        const isDim = hovering && !isHot;
+        const g = lEl('g', {class:'link-el', opacity: isDim ? 0.07 : 1});
+        lEl('line', {x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, stroke:e.stroke,
+          'stroke-width': isHot ? e.width+0.75 : e.width,
+          'stroke-dasharray': e.dashed ? '4,3' : 'none',
+          'stroke-opacity': isHot ? 1 : 0.75}, g);
+        lEl('rect', {x: midX-(isHot?33:18), y: midY-(isHot?17:9),
+          width: isHot?66:36, height: isHot?34:16, rx:2,
+          fill:'var(--card)', stroke:e.stroke, 'stroke-width': isHot?1:0.75, opacity:0.95}, g);
+        lText(midX, midY+(isHot?-3:3), e.wr+'%', {'text-anchor':'middle',
+          'font-family':'Courier Prime, monospace', 'font-size': isHot?15:9.5,
+          'font-weight':'700', fill:e.stroke}, g);
+        if(isHot){
+          lText(midX, midY+11, e.games+' OPS', {'text-anchor':'middle',
+            'font-family':'IBM Plex Mono, monospace', 'font-size':'8.5', 'font-weight':'600',
+            'letter-spacing':'1', fill:'var(--muted)'}, g);
+          lText(midX, midY+31, e.bond.label, {'text-anchor':'middle',
+            'font-family':'IBM Plex Mono, monospace', 'font-size':'8.5', 'font-weight':'600',
+            'letter-spacing':'1.5', fill:e.bond.color}, g);
+        }
+      });
+      for(let i=0;i<N;i++){
+        const p = linkPos[i];
+        const angle = Math.atan2(p.y-LCY, p.x-LCX);
+        const rawLx = p.x + 26*Math.cos(angle), ly = p.y + 26*Math.sin(angle);
+        const dx = p.x - LCX;
+        const anchor = dx > 15 ? 'start' : dx < -15 ? 'end' : 'middle';
+        const lx = anchor==='start' ? Math.min(rawLx, 400-78)
+          : anchor==='end' ? Math.max(rawLx, 78)
+          : Math.min(Math.max(rawLx, 42), 400-42);
+        const vertNudge = Math.abs(dx) <= 15 ? (p.y < LCY ? -6 : 6) : 0;
+        const nodeDim = hovering && hoverOp !== i;
+        const g = lEl('g', {class:'link-el', opacity: nodeDim ? 0.5 : 1});
+        g.style.cursor = 'default';
+        g.addEventListener('mouseenter', () => renderLink(i));
+        g.addEventListener('mouseleave', () => renderLink(null));
+        lEl('circle', {cx:p.x, cy:p.y, r:22, fill:'transparent'}, g);
+        lEl('line', {x1:p.x-10, y1:p.y, x2:p.x-4, y2:p.y, stroke:'var(--text)', 'stroke-width':0.75}, g);
+        lEl('line', {x1:p.x+4, y1:p.y, x2:p.x+10, y2:p.y, stroke:'var(--text)', 'stroke-width':0.75}, g);
+        lEl('line', {x1:p.x, y1:p.y-10, x2:p.x, y2:p.y-4, stroke:'var(--text)', 'stroke-width':0.75}, g);
+        lEl('line', {x1:p.x, y1:p.y+4, x2:p.x, y2:p.y+10, stroke:'var(--text)', 'stroke-width':0.75}, g);
+        lEl('circle', {cx:p.x, cy:p.y, r:2.5, fill:'var(--text)'}, g);
+        lText(lx, ly+vertNudge, members[i].toUpperCase(), {'text-anchor':anchor,
+          'font-family':'IBM Plex Mono, monospace', 'font-size':'10', 'font-weight':'600',
+          'letter-spacing':'1.2', fill:'var(--text)'}, g);
+        lText(lx, ly+vertNudge+12, opGames[i]+' OPS', {'text-anchor':anchor,
+          'font-family':'IBM Plex Mono, monospace', 'font-size':'8', 'font-weight':'400',
+          fill:'var(--muted)'}, g);
+      }
+      linkInactive.forEach((name, i) => {
+        const p = linkInactivePos[i];
+        const g = lEl('g', {class:'link-el', opacity: hovering ? 0.2 : 0.35});
+        lEl('line', {x1:p.x-5, y1:p.y, x2:p.x+5, y2:p.y, stroke:'var(--muted)', 'stroke-width':0.5}, g);
+        lEl('line', {x1:p.x, y1:p.y-5, x2:p.x, y2:p.y+5, stroke:'var(--muted)', 'stroke-width':0.5}, g);
+        lText(p.x, p.y+14, name.toUpperCase(), {'text-anchor':'middle',
+          'font-family':'IBM Plex Mono, monospace', 'font-size':'9', 'font-weight':'600',
+          'letter-spacing':'1', fill:'var(--muted)'}, g);
+      });
+    }
+    renderLink(null);
 
     /* ── HEATMAP ── */
     const days = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
@@ -1458,6 +1473,33 @@
         ? secs + 's'
         : Math.floor(secs/60) + 'm ' + (secs % 60) + 's';
     }, 1000);
+  </script>
+
+  <!-- Campaign Record hover crosshair + tooltip -->
+  <script>
+    (function () {
+      var LB = ['JAN 05','JAN 12','JAN 19','JAN 26','FEB 02','FEB 09','FEB 16','FEB 23','MAR 02','MAR 09','MAR 16','MAR 23','MAR 30','APR 06','APR 13','APR 20','APR 27','MAY 04','MAY 11','MAY 18','MAY 25','JUN 01','JUN 08','JUN 15'];
+      var XS = [46,50.4,54.8,59.2,63.6,68,94.4,98.9,103.3,107.7,112.1,116.5,120.9,125.3,129.7,134.1,168.5,172.9,177.3,181.7,186.1,190.6,195,199.4,203.8,208.2,212.6,217,221.4,225.8,230.2,234.6,239,243.4,247.9,252.3,256.7,261.1,265.5,269.9,274.3,278.7,283.1,287.5,291.9,296.3,300.7,305.1,309.6,314,318.4,322.8,327.2,331.6,336,340.4,358.8,363.2,367.6,394,398.4,402.9,407.3,411.7,416.1,420.5,424.9,429.3,433.7,438.1,442.5,446.9,451.3,455.7,460.1,464.6,469,473.4,477.8,482.2,486.6,521,525.4,529.8,534.2,538.6,543,547.4,551.9,556.3,560.7,565.1,569.5,573.9,578.3,582.7,587.1,591.5,595.9,600.3,604.7,609.1,643.6,648,652.4,656.8,661.2,665.6,670];
+      var WINS = '1111001011011111110010011101100001101101100001100000010110001011111111111111110111011000011111000001111011111';
+      var WK = [0,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,10,10,10,13,13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,18,18,18,18,18,18,18,18,18,19,19,19,19,19,19,19,19,19,19,19,19,23,23,23,23,23,23,23];
+      var ROLL = [100,100,100,100,80,67,71,63,67,70,64,67,69,71,73,75,76,78,74,70,70,65,60,60,65,70,65,70,70,65,65,60,55,55,55,50,50,50,50,55,55,55,55,50,45,45,50,45,40,40,40,40,40,40,35,40,40,35,35,30,30,30,35,40,45,45,45,50,55,60,65,70,75,75,80,80,80,85,85,90,90,95,90,90,90,85,80,75,70,70,70,70,70,70,65,60,55,50,50,50,50,50,55,50,50,55,60,65,70];
+      var n = XS.length;
+      var svg = document.getElementById('crSvg'), hl = document.getElementById('crHl'), tip = document.getElementById('crTip');
+      if (!svg || !hl || !tip) return;
+      svg.addEventListener('mousemove', function (e) {
+        var r = svg.getBoundingClientRect();
+        var mx = (e.clientX - r.left) * (680 / r.width);
+        var i = 0, bd = 1e9;
+        for (var k = 0; k < n; k++) { var d = Math.abs(XS[k] - mx); if (d < bd) { bd = d; i = k; } }
+        var x = XS[i];
+        hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', 1);
+        tip.innerHTML = '<strong>GAME ' + (i + 1) + ' &mdash; WK OF ' + LB[WK[i]] + '</strong><br>' + (WINS[i] === '1' ? 'WIN' : 'LOSS') + ' &middot; ROLLING ' + ROLL[i] + '%';
+        tip.style.display = 'block';
+        tip.style.left = (x / 680 * 100) + '%';
+        tip.style.transform = i > n * 0.75 ? 'translateX(-105%)' : (i < n * 0.15 ? 'translateX(5%)' : 'translateX(-50%)');
+      });
+      svg.addEventListener('mouseleave', function () { hl.setAttribute('opacity', 0); tip.style.display = 'none'; });
+    })();
   </script>
 
 </body>

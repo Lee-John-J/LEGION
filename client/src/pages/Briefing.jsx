@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { MOCK_STATS, isMockCell } from '../lib/mockData'
 import CellOverlay from '../components/CellOverlay'
+import CampaignRecord from '../components/CampaignRecord'
 import Footer from '../components/Footer'
 
 /* ── Redacted placeholder helpers ── */
@@ -139,12 +140,6 @@ function renderPoolBar(champs, totalGames, uniqueCount) {
       </div>
     )}
   </>
-}
-
-/* ── Tilt Index segment coloring ── */
-function tiltSegClass(idx, score) {
-  if (idx >= Math.round(score)) return ''
-  return score >= 7 ? 'on-red' : 'on-amber'
 }
 
 /* ── Link Analysis SVG ── */
@@ -914,6 +909,18 @@ export default function Briefing() {
         </div>
 
         {/* ════════════════════════════
+            CAMPAIGN RECORD
+            ════════════════════════════ */}
+        <div className="card fun-card intel-reveal reveal-d3">
+          <div className="fun-label">&bull; Trend Analysis</div>
+          <div className="fun-title">Campaign Record</div>
+          <div className="fun-subtitle">Rolling 20-game win rate across the season</div>
+          <div className="fun-body">
+            <CampaignRecord timeline={hasData ? stats.timeline : null} />
+          </div>
+        </div>
+
+        {/* ════════════════════════════
             CHAMPION POOLS
             ════════════════════════════ */}
         <div className="card fun-card pools-card intel-reveal reveal-d3">
@@ -1095,93 +1102,6 @@ export default function Briefing() {
           <div className="eyebrow">&bull; ANALYST NOTES</div>
           <h2 className="section-title">Behavioral Intelligence</h2>
           <div className="section-subtitle">Performance anomalies, synergies, and deployment patterns</div>
-        </div>
-
-        {/* ════════════════════════════
-            ANALYST ROW: TILT INDEX
-            ════════════════════════════ */}
-        <div className="analyst-solo intel-reveal reveal-d5">
-
-          {/* TILT INDEX */}
-          <div className="card fun-card">
-            <div className="fun-label">&bull; Behavioral Assessment</div>
-            <div className="fun-title">Tilt Index</div>
-            <div className="fun-body">
-
-              {/* What we're measuring */}
-              <div className="tilt-measuring">
-                <div className="tilt-measuring-label">WHAT WE&rsquo;RE MEASURING</div>
-                <div className="tilt-measuring-text">
-                  Post-loss cohesion decay across consecutive-loss sequences. Scale 0&ndash;10. Higher = worse.
-                </div>
-              </div>
-
-              {hasData && stats.tilt_index ? (() => {
-                const ti = stats.tilt_index
-                const score = ti.score ?? 0
-                const level = ti.level ?? 'GUARDED'
-                return (
-                  <>
-                    <div className="tilt-class-head">
-                      <div className="tilt-class-label">THREAT LEVEL</div>
-                      <div className="tilt-class-value" style={{
-                        color: score >= 7 ? 'var(--red)' : score >= 5 ? 'var(--amber)' : 'var(--green)',
-                      }}>
-                        {level.toUpperCase()}
-                      </div>
-                      <div className="tilt-class-score">{score.toFixed(1)} / 10</div>
-                    </div>
-                    <div className="tilt-segments">
-                      {Array.from({ length: 10 }).map((_, i) => (
-                        <div key={i} className={`tilt-seg ${tiltSegClass(i, score)}`} />
-                      ))}
-                    </div>
-                    <div className="judgments-head">KEY JUDGMENTS</div>
-                    {(ti.judgments || []).map((j, idx) => (
-                      <div key={idx} className="judgment">
-                        {typeof j === 'object' && j.label
-                          ? <><strong>{j.label}</strong> &mdash; {j.text}</>
-                          : j}
-                      </div>
-                    ))}
-                    <div className="tilt-analyst-note">
-                      {score >= 7
-                        ? 'Post-loss performance decline is assessed as ALMOST CERTAINLY a material factor in cell outcomes. Operational pause following consecutive losses is STRONGLY recommended.'
-                        : score >= 5
-                        ? 'Post-loss cohesion decay is consistent with the recorded sample. Analyst assesses behavioral disruption as PROBABLY a contributing factor. Session discipline merits monitoring.'
-                        : 'Tilt susceptibility within normal operational parameters. No corrective action indicated at this time.'}
-                    </div>
-                    <div className="confidence-stamp">
-                      CONFIDENCE: {ti.confidence?.toUpperCase() || 'MODERATE'} &middot; N={stats.games_together}
-                    </div>
-                  </>
-                )
-              })() : (
-                <>
-                  <div className="tilt-class-head">
-                    <div className="tilt-class-label">THREAT LEVEL</div>
-                    <div className="tilt-class-value" style={{ color: 'var(--muted)' }}>
-                      <R w={100} h={20} />
-                    </div>
-                    <div className="tilt-class-score"><R w={60} h={16} /></div>
-                  </div>
-                  <div className="tilt-segments">
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <div key={i} className="tilt-seg" style={{ background: 'var(--ink)', opacity: 0.6 }} />
-                    ))}
-                  </div>
-                  <div className="judgments-head">KEY JUDGMENTS</div>
-                  {[0.9, 0.75, 0.82, 0.7, 0.85].map((w, i) => (
-                    <div key={i} className="judgment">
-                      <RedactedBar w={`${w * 100}%`} h={10} />
-                    </div>
-                  ))}
-                  <div className="confidence-stamp"><R w={160} h={10} /></div>
-                </>
-              )}
-            </div>
-          </div>
-
         </div>
 
         {/* ════════════════════════════

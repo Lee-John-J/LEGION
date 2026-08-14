@@ -39,7 +39,7 @@ and want insight into how they perform *together*, not just individually.
 | Logout | DISENGAGE | — |
 | Settings | DIRECTIVES | — |
 | Match with 2+ cell members on the same team | JOINT DEPLOYMENT | Core concept — this is what LEGION tracks |
-| Post-loss cohesion metric | TILT INDEX | Composite score, formula TBD |
+| Season trend chart | CAMPAIGN RECORD | Rolling 20-game WR over joint deployments, game-time axis |
 | Analyst-written stat observations | FIELD ASSESSMENT | Templated, severity-coded cards |
 | Parent agency (lore) | ZOO | See Lore section below |
 
@@ -113,7 +113,7 @@ and is never explained in the UI.
 --red-mid:       #ef4444      /* medium red */
 --red-bg:        #fee2e2      /* red tint (loss cards) */
 --red-dark:      #7f1d1d      /* dark red */
---amber:         #b45309      /* anomaly / monitor (tilt index) */
+--amber:         #b45309      /* anomaly / monitor */
 --amber-mid:     #f59e0b      /* medium amber */
 --amber-bg:      #fef3c7      /* amber tint */
 --blue:          #1d4ed8      /* neutral observation / info */
@@ -386,14 +386,24 @@ Main dashboard — ALL stats live here. Sections top-to-bottom:
      unrelated edges/nodes and reveals per-pair pills (WR + shared games + bond
      class); resting view is lines only. Inactive operators shown as orbit nodes.
    - **Activity Heatmap** (right): 7-day x 24-hour grid. Slate scale `h-0` through `h-5`
-5. **Champion Pools card:**
+5. **Campaign Record card (full width):**
+   - Season trend chart on a GAME-TIME axis: one step per joint deployment,
+     so the line never breaks during idle spells
+   - Line = rolling 20-game win rate; faded dashed 50% reference line
+   - Idle periods of 7+ days render as hatched "dark period" bands (width
+     scales with idle length, capped); line and barcode break around them
+   - W/L barcode strip under the axis: one tick per game, green win / red loss
+   - Month labels along the bottom, spaced by activity (busy months are wider)
+   - Streak annotations (longest win run in green, longest loss slump in red)
+     with paper-halo text so gridlines never cover them
+   - Records footnote: best run, worst slump, peak weekly volume, with dates
+   - Hover: black dashed crosshair + tooltip (game #, date, result, rolling WR)
+   - Data source: `timeline` array ({ts, win} per joint match) in the stats payload
+6. **Champion Pools card:**
    - One row per active operator (alphabetical)
    - Class badge: `SPECIALIST`, `ONE-TRICK`, `NARROW`, `ROLE-LOCKED`, `CHAOTIC`, `INCONCLUSIVE`
    - Segmented bar showing pick distribution (monochrome scale `s-1` through `s-5`)
    - Terse bureaucratic profile observation note
-6. **Behavioral Intelligence section:**
-   - **Tilt Index** (full width): threat level classification (e.g. `ELEVATED 7.2/10`),
-     10-segment scale, 5 key judgments, confidence stamp. Formula TBD.
 7. **Analyst Observations (Field Assessments):**
    - 6 cards in 2-column grid
    - Each: severity stripe (green/red/amber/blue/black), code (`OBS-NN`), title,
@@ -508,7 +518,7 @@ Build only these features in V1. Do not add scope.
    - Link Analysis (ring network graph of pair WRs; hover to isolate an operator)
    - Activity Heatmap (7-day x 24-hour)
    - Champion Pools (per-operator distribution bars + class badges)
-   - Behavioral Intelligence (Tilt Index, full width)
+   - Campaign Record (full-width season trend: game-time rolling WR, dark periods, streak records)
    - Analyst Observations (6 field assessment cards)
 5. **Operation Log** — Joint match history with theater/outcome/operator filters
 6. **Cell switcher** — Header dropdown to switch between cells
@@ -534,8 +544,10 @@ Build only these features in V1. Do not add scope.
 - **Field Assessment templates:** Need 30-50 archetypes (cell-core synergy,
   incompatibility, temporal variance, etc.) with trigger conditions, slot specs,
   prose templates, and severity tags. To be authored during build.
-- **Tilt Index formula:** Composite metric tracking post-loss cohesion decay.
-  Concept is defined; exact computation is TBD.
+- **Campaign Record time ranges:** Chart currently shows the full season at
+  per-game resolution. A 30D / SPLIT / SEASON range selector (with per-night
+  resolution at 30D) was designed but deliberately cut — revisit if cells with
+  long histories find the chart crowded.
 
 ---
 
@@ -655,7 +667,6 @@ LEGION/
 - Invite code system (table + generation + validation)
 - Handler management UI
 - Field Assessment templates authored
-- Tilt Index formula specified and implemented
 
 ---
 
@@ -665,3 +676,4 @@ LEGION/
 |---|---|
 | 2026-04-05 | Full V1 scaffold: React+Vite+Tailwind frontend, Express backend, all pages, Riot API service, stats engine, Supabase schema |
 | 2026-05-13 | CLAUDE.md audit + consolidation: merged project-summary.md and mockup-feature-reference.md into single source of truth, fixed color palette, typography, terminology, routes, and feature scope to match actual mockups |
+| 2026-08-14 | Campaign Record replaces Tilt Index on the Briefing: new full-width season trend chart (game-time rolling 20-game WR, hatched dark periods, W/L barcode, streak records) placed before Champion Pools. Server stats now emit a `timeline` array; Tilt UI removed (tilt heuristics retained server-side to feed Analyst Observations). Mockup briefing.html re-synced with the live app (Link Analysis in top row, Duo Win Rates matrix removed, ARAM Mayhem advisory added) |
