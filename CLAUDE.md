@@ -399,12 +399,14 @@ Main dashboard — ALL stats live here. Sections top-to-bottom:
    - Records footnote: best run, worst slump, peak weekly volume, with dates
    - Hover: black dashed crosshair + tooltip (game #, date, result, rolling WR)
    - Data source: `timeline` array ({ts, win} per joint match) in the stats payload
-6. **Champion Pools card:**
+6. **Behavioral Intelligence section header** (eyebrow `ANALYST NOTES`) —
+   umbrella over the remaining analyst cards (Champion Pools + Analyst Observations)
+7. **Champion Pools card:**
    - One row per active operator (alphabetical)
    - Class badge: `SPECIALIST`, `ONE-TRICK`, `NARROW`, `ROLE-LOCKED`, `CHAOTIC`, `INCONCLUSIVE`
    - Segmented bar showing pick distribution (monochrome scale `s-1` through `s-5`)
    - Terse bureaucratic profile observation note
-7. **Analyst Observations (Field Assessments):**
+8. **Analyst Observations (Field Assessments):**
    - 6 cards in 2-column grid
    - Each: severity stripe (green/red/amber/blue/black), code (`OBS-NN`), title,
      subject line, analyst-voice note (1-3 sentences)

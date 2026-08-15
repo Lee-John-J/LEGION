@@ -921,9 +921,18 @@ export default function Briefing() {
         </div>
 
         {/* ════════════════════════════
+            ANALYST NOTES SECTION HEADER
+            ════════════════════════════ */}
+        <div className="section-divider intel-reveal reveal-d4">
+          <div className="eyebrow">&bull; ANALYST NOTES</div>
+          <h2 className="section-title">Behavioral Intelligence</h2>
+          <div className="section-subtitle">Performance anomalies, synergies, and deployment patterns</div>
+        </div>
+
+        {/* ════════════════════════════
             CHAMPION POOLS
             ════════════════════════════ */}
-        <div className="card fun-card pools-card intel-reveal reveal-d3">
+        <div className="card fun-card pools-card intel-reveal reveal-d5">
           <div className="fun-label">&bull; Operator Profiles</div>
           <div className="fun-title">Champion Pools</div>
           <div className="fun-subtitle">Champion selection patterns, by subject and theater</div>
@@ -1093,15 +1102,6 @@ export default function Briefing() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* ════════════════════════════
-            ANALYST NOTES SECTION HEADER
-            ════════════════════════════ */}
-        <div className="section-divider intel-reveal reveal-d4">
-          <div className="eyebrow">&bull; ANALYST NOTES</div>
-          <h2 className="section-title">Behavioral Intelligence</h2>
-          <div className="section-subtitle">Performance anomalies, synergies, and deployment patterns</div>
         </div>
 
         {/* ════════════════════════════
