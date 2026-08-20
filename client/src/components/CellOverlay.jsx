@@ -4,11 +4,38 @@ import { useAuth } from '../hooks/useAuth'
 
 export default function CellOverlay() {
   const navigate = useNavigate()
-  const { activeCell, cellsLoading } = useAuth()
+  const { activeCell, cellsLoading, cellsError, refreshCells } = useAuth()
   const [dismissed, setDismissed] = useState(false)
 
   // Wait until cells have actually been fetched before deciding
   if (cellsLoading) return null
+
+  // State 0: the cell list FAILED to load. Do not fall through to the
+  // "no active case file" pitch — that would invite a user who already has
+  // a cell to create a duplicate. Offer a retry instead.
+  if (cellsError && !activeCell) {
+    return (
+      <div className="auth-overlay">
+        <div className="auth-overlay-card form-card" role="alert">
+          <div className="form-card-banner">
+            CONFIDENTIAL // RECORDS RETRIEVAL // TEMPORARY FAULT
+          </div>
+          <h1 className="form-title">Records Unavailable</h1>
+          <p className="form-subtitle">
+            Case file retrieval failed. This is a transmission fault, not a
+            missing file — your records remain intact. Re-attempt retrieval.
+          </p>
+          <button
+            className="submit-btn"
+            style={{ width: '100%' }}
+            onClick={() => refreshCells()}
+          >
+            RE-ATTEMPT RETRIEVAL
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // State 1: Logged in, no cell at all → create or join
   if (!activeCell) {

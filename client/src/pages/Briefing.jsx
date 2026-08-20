@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { MOCK_STATS, isMockCell } from '../lib/mockData'
@@ -26,17 +26,6 @@ function pct(n) {
   // If already a 0-100 number (from the mockup shape), don't multiply
   const val = n <= 1 ? n * 100 : n
   return `${val.toFixed(1)}%`
-}
-
-// Accepts 0-1 fraction
-function wrClass(rate) {
-  if (rate == null) return ''
-  const r = rate <= 1 ? rate : rate / 100
-  if (r >= 0.62) return 'wr-great'
-  if (r > 0.50) return 'wr-high'
-  if (r === 0.50) return 'wr-neutral'
-  if (r >= 0.40) return 'wr-mid'
-  return 'wr-low'
 }
 
 function modeBarClass(rate) {
@@ -235,11 +224,12 @@ function buildLinkSVG(ops, duoStats) {
 }
 
 export default function Briefing() {
-  const { user, activeCell } = useAuth()
+  const { user, activeCell, riotLinkError } = useAuth()
   const [stats, setStats] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   // Index of the active operator being hovered in Link Analysis (null = none)
   const [hoverOp, setHoverOp] = useState(null)
 
@@ -247,21 +237,36 @@ export default function Briefing() {
   const hasCell = !!(user && activeCell)
   const hasData = stats && stats.games_together > 0
 
+  // Monotonic token: a slow response for a previously viewed cell must never
+  // overwrite the current cell's data (cell-switch race).
+  const fetchSeq = useRef(0)
+
   const fetchStats = useCallback(async () => {
     if (!cellId) return
+    const seq = ++fetchSeq.current
     setLoading(true)
+    setFetchError(null)
     try {
-      if (isMockCell(cellId)) {
-        setStats(MOCK_STATS)
-      } else {
-        const data = await api.getCellStats(cellId)
-        setStats(data)
+      const data = isMockCell(cellId) ? MOCK_STATS : await api.getCellStats(cellId)
+      if (seq === fetchSeq.current) setStats(data)
+    } catch (err) {
+      // Surface the failure — a swallowed error is indistinguishable from
+      // loading forever, and the user can't report what they can't see.
+      if (seq === fetchSeq.current) {
+        setStats(null)
+        setFetchError(err)
       }
-    } catch {
-      setStats(null)
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) setLoading(false)
     }
+  }, [cellId])
+
+  // Clear per-cell state the moment the active cell changes, so cell A's
+  // stats or sync banner never linger under cell B's header.
+  useEffect(() => {
+    setStats(null)
+    setSyncResult(null)
+    setFetchError(null)
   }, [cellId])
 
   useEffect(() => {
@@ -355,13 +360,18 @@ export default function Briefing() {
   // This is the cell's joint WR in matches where THIS user was absent
   const currentUserWrWithout = useMemo(() => {
     if (!hasData || !stats.operator_stats) return null
+    // Match by permanent user_id — Riot names change (per CLAUDE.md, PUUIDs
+    // and user ids never do). Name comparison is only a fallback for older
+    // payloads without user_id.
     const me = stats.operator_stats.find((op) =>
+      (user?.id && op.user_id === user.id) ||
       op.name?.toLowerCase() === currentUserName.toLowerCase()
     )
     return me?.wr_without ?? null
-  }, [hasData, stats, currentUserName])
+  }, [hasData, stats, currentUserName, user])
 
-  // Delta between joint WR and WR-without-you
+  // Delta between joint WR and WR-without-you, rounded to one decimal.
+  // Rounded BEFORE the sign check so a -0.04 doesn't render as a green "-0.0".
   const wrDelta = useMemo(() => {
     if (!hasData) return null
     const joint = stats.win_rate_together
@@ -369,7 +379,8 @@ export default function Briefing() {
     if (joint == null || without == null) return null
     const jv = joint <= 1 ? joint * 100 : joint
     const wv = without <= 1 ? without * 100 : without
-    return (jv - wv).toFixed(1)
+    const rounded = Math.round((jv - wv) * 10) / 10
+    return rounded === 0 ? 0 : rounded // normalize -0 to 0
   }, [hasData, stats, currentUserWrWithout])
 
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -419,7 +430,7 @@ export default function Briefing() {
               )}
             </div>
             {syncResult && (
-              <div className="sync-result">
+              <div className="sync-result" role="status">
                 {syncResult.status === 'ERROR'
                   ? `SYNC FAILED: ${syncResult.message}`
                   : syncResult.remaining > 0
@@ -431,7 +442,39 @@ export default function Briefing() {
         </div>
       </div>
 
-      <div className={`dashboard${hasCell && !stats ? ' loading' : ''}`}>
+      <div className={`dashboard${hasCell && !stats && !fetchError ? ' loading' : ''}`}>
+
+        {/* ── RIOT LINK FAULT (link failed at sign-in; stats will be stale) ── */}
+        {hasCell && riotLinkError && (
+          <div className="card fetch-error-card warn" role="alert">
+            <div className="fetch-error-title">RIOT LINK FAULT</div>
+            <p className="fetch-error-note">
+              {riotLinkError} New deployments cannot be filed for this operator
+              until the link is restored. Verify the Riot ID on record.
+            </p>
+          </div>
+        )}
+
+        {/* ── FETCH FAILURE NOTICE (distinct from loading) ── */}
+        {hasCell && fetchError && !stats && (
+          <div className="card fetch-error-card" role="alert">
+            <div className="fetch-error-title">
+              {fetchError.status === 401 ? 'CLEARANCE EXPIRED' : 'RETRIEVAL FAULT'}
+            </div>
+            <p className="fetch-error-note">
+              {fetchError.status === 401
+                ? 'Session credentials have lapsed. Re-authenticate to restore briefing access.'
+                : 'Field reports could not be retrieved. This is a transmission fault — records remain intact.'}
+            </p>
+            {fetchError.status === 401 ? (
+              <a className="fetch-error-btn" href="/authenticate?return_to=/briefing">RE-AUTHENTICATE</a>
+            ) : (
+              <button className="fetch-error-btn" onClick={fetchStats} disabled={loading}>
+                {loading ? 'RETRYING...' : 'RE-ATTEMPT RETRIEVAL'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── INVITE CODE BANNER (collapsible) ── */}
         {hasCell && activeCell.invite_code && (
@@ -484,8 +527,8 @@ export default function Briefing() {
               </div>
               <div className="cm-summary-note">
                 {hasData && wrDelta != null ? (
-                  <span className={`badge ${parseFloat(wrDelta) >= 0 ? 'badge-green' : 'badge-red'}`}>
-                    {parseFloat(wrDelta) >= 0 ? '↑' : '↓'} {Math.abs(wrDelta)} pts vs. without you
+                  <span className={`badge ${wrDelta >= 0 ? 'badge-green' : 'badge-red'}`}>
+                    {wrDelta >= 0 ? '↑' : '↓'} {Math.abs(wrDelta).toFixed(1)} pts vs. without you
                   </span>
                 ) : <R w={100} h={10} />}
               </div>
@@ -560,7 +603,11 @@ export default function Briefing() {
             <tbody>
               {hasData && stats.operator_stats ? (
                 stats.operator_stats.map((op) => {
-                  const isYou = currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase()
+                  // user_id first (Riot names change), name as fallback
+                  const isYou = Boolean(
+                    (user?.id && op.user_id === user.id) ||
+                    (currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase())
+                  )
                   const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
                   const isActive = op.last_played != null && op.last_played > sevenDaysAgo
                   return (
@@ -579,13 +626,14 @@ export default function Briefing() {
                       </td>
                       <td className="cm-num">{op.games}</td>
                       <td className={`cm-num ${
+                        op.win_rate == null ? '' :
                         (op.win_rate <= 1 ? op.win_rate : op.win_rate / 100) > 0.5
                           ? 'cm-num-pos'
                           : (op.win_rate <= 1 ? op.win_rate : op.win_rate / 100) < 0.48
                           ? 'cm-num-neg'
                           : ''
                       }`}>
-                        {pct(op.win_rate)}
+                        {op.win_rate != null ? pct(op.win_rate) : '—'}
                       </td>
                       <td className={`cm-num ${
                         isYou && op.wr_without != null
@@ -939,7 +987,7 @@ export default function Briefing() {
           <div className="fun-body">
             <div className="pools-grid">
               {hasData && stats.operator_stats ? (
-                stats.operator_stats.map((op, opIdx) => {
+                stats.operator_stats.map((op) => {
                   const isYou = currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase()
                   const totalGames = op.games || 0
                   const allChamps = op.top_champions || []

@@ -46,22 +46,23 @@ const buckets = {
 function refillBucket(b) {
   const now = Date.now()
   const elapsed = now - b.lastRefill
-  const refills = Math.floor(elapsed / b.refillMs)
-  if (refills > 0) {
-    b.tokens = Math.min(b.max, b.tokens + refills * b.max)
-    b.lastRefill += refills * b.refillMs
-  }
+  if (elapsed <= 0) return
+  // Continuous (proportional) refill; tokens may be fractional. The old
+  // whole-bucket-per-interval refill let ~2x the limit through at an
+  // interval boundary, inviting 429s.
+  b.tokens = Math.min(b.max, b.tokens + (elapsed / b.refillMs) * b.max)
+  b.lastRefill = now
 }
 
 function canConsume() {
   refillBucket(buckets.perSecond)
   refillBucket(buckets.per2Min)
-  return buckets.perSecond.tokens > 0 && buckets.per2Min.tokens > 0
+  return buckets.perSecond.tokens >= 1 && buckets.per2Min.tokens >= 1
 }
 
 function consume() {
-  buckets.perSecond.tokens--
-  buckets.per2Min.tokens--
+  buckets.perSecond.tokens -= 1
+  buckets.per2Min.tokens -= 1
 }
 
 const queue = []
@@ -104,7 +105,11 @@ async function riotFetch(url, retries = 2) {
   })
 
   if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get('Retry-After') || '2', 10)
+    // Retry-After may be an HTTP date (parseInt -> NaN, which would retry
+    // instantly), and honoring a long wait would blow the 60s serverless
+    // budget — default NaN to 2s and cap the sleep at 10s.
+    const parsed = parseInt(res.headers.get('Retry-After') || '2', 10)
+    const retryAfter = Math.min(Number.isFinite(parsed) ? parsed : 2, 10)
     console.warn(`[RIOT] Rate limited — retrying in ${retryAfter}s`)
     if (retries <= 0) throw new Error('RATE_LIMITED')
     await new Promise((r) => setTimeout(r, retryAfter * 1000))

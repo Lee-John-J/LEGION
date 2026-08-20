@@ -15,15 +15,22 @@ export function AuthProvider({ children }) {
   const [activeCell, setActiveCellState] = useState(null)
   const [cellsLoading, setCellsLoading] = useState(true)
   const [riotLinkError, setRiotLinkError] = useState(null)
+  const [cellsError, setCellsError] = useState(false)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   const fetchCells = useCallback(async () => {
     setCellsLoading(true)
     try {
       const data = await api.getCells()
       setCells(data)
+      setCellsError(false)
       return data
     } catch {
+      // Keep "failed to load" distinct from "has no cells" — treating an
+      // outage as a zero-cell account steers users toward creating a
+      // duplicate cell they already have.
       setCells([])
+      setCellsError(true)
       return []
     } finally {
       setCellsLoading(false)
@@ -84,10 +91,18 @@ export function AuthProvider({ children }) {
         setLoading(false)
         setCellsLoading(false)
       }
+    }).catch(() => {
+      // Never leave the app stuck behind the loading gate if the session
+      // lookup itself rejects — that renders as a permanently blank page.
+      setLoading(false)
+      setCellsLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session && DEV_MOCK) return
+      // User arrived via a password-reset email link: hold them on the
+      // Authenticate page to set a new passcode instead of redirecting.
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
       setSession(session)
       if (event === 'SIGNED_IN' && session?.user) {
         linkRiotIdIfNeeded(session.user)
@@ -129,9 +144,19 @@ export function AuthProvider({ children }) {
       return
     }
 
+    // Skip the network call when this browser already linked this exact Riot
+    // ID for this user — without this, every page load re-links. The server
+    // has its own short-circuit too, so clearing localStorage is always safe.
+    const linkKey = `legion_linked:${user.id}`
+    const linkVal = `${name}#${tag}`.toLowerCase()
+    try {
+      if (localStorage.getItem(linkKey) === linkVal) return
+    } catch { /* storage unavailable — fall through to the network call */ }
+
     try {
       await api.linkRiotId({ riotGameName: name, riotTagLine: tag })
       setRiotLinkError(null)
+      try { localStorage.setItem(linkKey, linkVal) } catch { /* non-fatal */ }
     } catch (err) {
       console.error(`[LEGION] Riot ID link failed for ${name}#${tag}:`, err.message)
       setRiotLinkError(`RIOT ID LINK FAILED FOR ${name}#${tag}: ${err.message}`)
@@ -158,16 +183,33 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }, [])
 
+  const resetPassword = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/authenticate`,
+    })
+    if (error) throw error
+  }, [])
+
+  const updatePassword = useCallback(async (password) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+    setPasswordRecovery(false)
+  }, [])
+
   const value = {
     session,
     user: session?.user ?? null,
     loading,
     cells,
     cellsLoading,
+    cellsError,
     activeCell,
     setActiveCell,
     refreshCells,
     riotLinkError,
+    passwordRecovery,
+    resetPassword,
+    updatePassword,
     signUp,
     signIn,
     logout,
@@ -180,6 +222,10 @@ export function AuthProvider({ children }) {
   )
 }
 
+// Provider and hook are deliberately co-located; a full reload of auth state
+// when editing this file is acceptable, and splitting the hook into its own
+// file would churn every consumer import for a dev-only nicety.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

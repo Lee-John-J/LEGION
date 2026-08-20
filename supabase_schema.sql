@@ -47,11 +47,13 @@ create table if not exists operators (
 );
 
 -- Cells: named friend groups
+-- created_by is ON DELETE SET NULL: a cell survives its creator's account
+-- deletion (members keep their data; the cell is simply handler-less).
 create table if not exists cells (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   invite_code text unique,
-  created_by  uuid references auth.users(id),
+  created_by  uuid references auth.users(id) on delete set null,
   created_at  timestamptz default now()
 );
 
@@ -62,6 +64,20 @@ do $$ begin
     where table_name = 'cells' and column_name = 'invite_code'
   ) then
     alter table cells add column invite_code text unique;
+  end if;
+end $$;
+
+-- Backfill: ensure created_by has ON DELETE SET NULL on pre-existing tables
+-- (the pre-audit schema had no delete rule, which made deleting any
+-- cell-creating user fail with an FK violation).
+do $$ begin
+  if exists (
+    select 1 from information_schema.referential_constraints
+    where constraint_name = 'cells_created_by_fkey' and delete_rule <> 'SET NULL'
+  ) then
+    alter table cells drop constraint cells_created_by_fkey;
+    alter table cells add constraint cells_created_by_fkey
+      foreign key (created_by) references auth.users(id) on delete set null;
   end if;
 end $$;
 
@@ -89,6 +105,7 @@ create table if not exists matches (
 create index if not exists idx_cell_members_cell_id on cell_members(cell_id);
 create index if not exists idx_cell_members_user_id on cell_members(user_id);
 create index if not exists idx_operators_user_id on operators(user_id);
+create index if not exists idx_cells_created_by on cells(created_by);
 create index if not exists idx_matches_participants on matches using gin(participants_puuids);
 
 -- ═══════════════════════════════════════════════════════════════
@@ -99,6 +116,11 @@ alter table operators enable row level security;
 alter table cells enable row level security;
 alter table cell_members enable row level security;
 alter table matches enable row level security;
+
+-- The anon role gets no table access at all: the browser client uses Supabase
+-- for auth only, so unauthenticated visitors have nothing to read here. This
+-- also hides the tables from anonymous GraphQL introspection.
+revoke all on operators, cells, cell_members, matches from anon;
 
 -- ═══════════════════════════════════════════════════════════════
 -- STEP 5: Helper function for RLS (avoids infinite recursion)
@@ -120,52 +142,52 @@ as $$
   );
 $$;
 
+-- Signed-in users need EXECUTE (the RLS policies below call this as the
+-- querying user), but anon must not be able to probe membership.
+revoke execute on function public.is_member_of_cell(uuid) from public, anon;
+
 -- ═══════════════════════════════════════════════════════════════
 -- STEP 6: Create policies (dropped in Step 1, so always fresh)
+--
+-- SECURITY MODEL (2026-08-19 audit): the browser client talks to Supabase for
+-- AUTH ONLY. Every table write goes through the Express server, which uses the
+-- service role and does its own membership/handler checks. RLS therefore
+-- grants end users READ access (plus self-scoped operator writes and the two
+-- delete paths), and deliberately defines NO insert/update policies for
+-- cells, cell_members, or matches — a client-side write must be denied.
+-- auth.uid() is wrapped in (select ...) so Postgres evaluates it once per
+-- query instead of once per row (Supabase perf lint 0003).
 -- ═══════════════════════════════════════════════════════════════
 
 -- Operators: users can read/write their own record
 create policy "operators: own record" on operators
-  for all using (auth.uid() = user_id);
+  for all
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Cells: members can read cells they belong to
 create policy "cells: members can read" on cells
   for select using (
-    created_by = auth.uid() or public.is_member_of_cell(id)
+    created_by = (select auth.uid()) or public.is_member_of_cell(id)
   );
-
--- Cells: any authenticated user can create a cell
-create policy "cells: authenticated can create" on cells
-  for insert with check (auth.uid() is not null);
 
 -- Cell members: visible to other members of the same cell
 create policy "cell_members: visible to members" on cell_members
   for select using (
-    user_id = auth.uid() or public.is_member_of_cell(cell_id)
+    user_id = (select auth.uid()) or public.is_member_of_cell(cell_id)
   );
-
--- Cell members: users can add themselves
-create policy "cell_members: self insert" on cell_members
-  for insert with check (auth.uid() = user_id);
 
 -- Cell members: handler can remove members; members can leave
 create policy "cell_members: handler or self delete" on cell_members
   for delete using (
-    user_id = auth.uid()
-    or exists (select 1 from cells where id = cell_members.cell_id and created_by = auth.uid())
+    user_id = (select auth.uid())
+    or exists (select 1 from cells where id = cell_members.cell_id and created_by = (select auth.uid()))
   );
 
 -- Cells: handler can dissolve
 create policy "cells: handler can delete" on cells
-  for delete using (created_by = auth.uid());
+  for delete using (created_by = (select auth.uid()));
 
 -- Matches: any authenticated user can read (game data is public)
 create policy "matches: authenticated read" on matches
-  for select using (auth.uid() is not null);
-
--- Matches: authenticated users can cache match data
-create policy "matches: authenticated insert" on matches
-  for insert with check (auth.uid() is not null);
-
-create policy "matches: authenticated update" on matches
-  for update using (auth.uid() is not null);
+  for select using ((select auth.uid()) is not null);

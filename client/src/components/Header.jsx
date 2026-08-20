@@ -25,8 +25,18 @@ export default function Header() {
         setManagingCellId(null)
       }
     }
+    function handleEscape(e) {
+      if (e.key === 'Escape') {
+        setDropdownOpen(false)
+        setManagingCellId(null)
+      }
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
   async function handleLogout() {
@@ -56,21 +66,27 @@ export default function Header() {
     }
   }, [dissolveTarget, refreshCells, navigate])
 
+  // Token so a slow roster response for cell A can't populate cell B's
+  // manage panel when the handler flips between cells quickly.
+  const manageSeq = useRef(0)
+
   async function handleManageToggle(e, cell) {
     e.stopPropagation()
     if (managingCellId === cell.id) {
       setManagingCellId(null)
       return
     }
+    const seq = ++manageSeq.current
     setManagingCellId(cell.id)
+    setManagedMembers([])
     setManagingLoading(true)
     try {
       const data = await api.getCell(cell.id)
-      setManagedMembers(data.members || [])
+      if (seq === manageSeq.current) setManagedMembers(data.members || [])
     } catch {
-      setManagedMembers([])
+      if (seq === manageSeq.current) setManagedMembers([])
     } finally {
-      setManagingLoading(false)
+      if (seq === manageSeq.current) setManagingLoading(false)
     }
   }
 

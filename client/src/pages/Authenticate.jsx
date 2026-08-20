@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 import Footer from '../components/Footer'
 
 export default function Authenticate() {
-  const { signIn, signUp, user, cells, cellsLoading } = useAuth()
+  const { signIn, signUp, user, cells, cellsLoading, passwordRecovery, resetPassword, updatePassword } = useAuth()
   const [searchParams] = useSearchParams()
   // Validate return_to to prevent open redirects to external sites
   const rawReturnTo = searchParams.get('return_to')
@@ -18,9 +18,14 @@ export default function Authenticate() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [signUpSuccess, setSignUpSuccess] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
-  if (user && cellsLoading) return null
-  if (user) {
+  // During password recovery a session exists, but the user must stay here
+  // to set a new passcode — suppress the usual signed-in redirect.
+  if (user && cellsLoading && !passwordRecovery) return null
+  if (user && !passwordRecovery) {
     if (returnTo) return <Navigate to={returnTo} replace />
     return <Navigate to={cells.length > 0 ? '/briefing' : '/intake'} replace />
   }
@@ -28,6 +33,43 @@ export default function Authenticate() {
   function switchMode(next) {
     setMode(next)
     setError(null)
+    setResetSent(false)
+  }
+
+  async function handleResetRequest(e) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await resetPassword(email)
+      setResetSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSetNewPassword(e) {
+    e.preventDefault()
+    setError(null)
+    if (newPassword.length < 8) {
+      setError('PASSCODE MUST BE EIGHT CHARACTERS MINIMUM.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('PASSCODE CONFIRMATION DOES NOT MATCH.')
+      return
+    }
+    setLoading(true)
+    try {
+      await updatePassword(newPassword)
+      // passwordRecovery flips false in useAuth; the redirect above takes over.
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSignIn(e) {
@@ -73,34 +115,116 @@ export default function Authenticate() {
             next step.
           </p>
 
-          <div className="auth-tabs" role="tablist">
-            <button
-              className={`auth-tab${mode === 'signin' ? ' active' : ''}`}
-              type="button"
-              role="tab"
-              onClick={() => switchMode('signin')}
-            >
-              Sign In
-            </button>
-            <button
-              className={`auth-tab${mode === 'signup' ? ' active' : ''}`}
-              type="button"
-              role="tab"
-              onClick={() => switchMode('signup')}
-            >
-              New Operator
-            </button>
-          </div>
-
-          {error && (
-            <div className="auth-error">ACCESS DENIED: {error}</div>
+          {!passwordRecovery && mode !== 'reset' && (
+            <div className="auth-tabs" role="tablist">
+              <button
+                className={`auth-tab${mode === 'signin' ? ' active' : ''}`}
+                type="button"
+                role="tab"
+                aria-selected={mode === 'signin'}
+                onClick={() => switchMode('signin')}
+              >
+                Sign In
+              </button>
+              <button
+                className={`auth-tab${mode === 'signup' ? ' active' : ''}`}
+                type="button"
+                role="tab"
+                aria-selected={mode === 'signup'}
+                onClick={() => switchMode('signup')}
+              >
+                New Operator
+              </button>
+            </div>
           )}
 
-          {mode === 'signin' && (
+          {error && (
+            <div className="auth-error" role="alert">ACCESS DENIED: {error}</div>
+          )}
+
+          {passwordRecovery && (
+            <form onSubmit={handleSetNewPassword}>
+              <div className="eyebrow eyebrow-green" style={{ marginBottom: 14 }}>
+                RECOVERY CHANNEL VERIFIED
+              </div>
+              <div className="field">
+                <label htmlFor="np-new">NEW PASSWORD</label>
+                <input
+                  id="np-new"
+                  type="password"
+                  placeholder="minimum eight characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="np-confirm">CONFIRM PASSWORD</label>
+                <input
+                  id="np-confirm"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </div>
+              <button type="submit" className="submit-btn" disabled={loading}>
+                {loading ? 'PROCESSING...' : 'SET NEW PASSCODE'}
+              </button>
+            </form>
+          )}
+
+          {!passwordRecovery && mode === 'reset' && !resetSent && (
+            <form onSubmit={handleResetRequest}>
+              <p className="form-subtitle" style={{ marginTop: 0 }}>
+                Provide the email on file. A reset directive will be
+                transmitted to that channel.
+              </p>
+              <div className="field">
+                <label htmlFor="reset-email">EMAIL</label>
+                <input
+                  id="reset-email"
+                  type="email"
+                  placeholder="you@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <button type="submit" className="submit-btn" disabled={loading}>
+                {loading ? 'TRANSMITTING...' : 'TRANSMIT RESET DIRECTIVE'}
+              </button>
+              <div className="forgot-link">
+                <button type="button" className="link-btn" onClick={() => switchMode('signin')}>
+                  &larr; Return to sign in
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!passwordRecovery && mode === 'reset' && resetSent && (
+            <div className="auth-success" role="status">
+              <div className="eyebrow eyebrow-green">DIRECTIVE TRANSMITTED</div>
+              <p>
+                If an operator file exists for that address, a reset directive
+                has been transmitted. Follow its link to set a new passcode.
+              </p>
+              <div className="forgot-link" style={{ marginTop: 12 }}>
+                <button type="button" className="link-btn" onClick={() => switchMode('signin')}>
+                  &larr; Return to sign in
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!passwordRecovery && mode === 'signin' && (
             <form onSubmit={handleSignIn}>
               <div className="field">
-                <label>EMAIL</label>
+                <label htmlFor="si-email">EMAIL</label>
                 <input
+                  id="si-email"
                   type="email"
                   placeholder="you@email.com"
                   value={email}
@@ -109,8 +233,9 @@ export default function Authenticate() {
                 />
               </div>
               <div className="field">
-                <label>PASSWORD</label>
+                <label htmlFor="si-password">PASSWORD</label>
                 <input
+                  id="si-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -121,16 +246,19 @@ export default function Authenticate() {
                 {loading ? 'VERIFYING...' : 'AUTHENTICATE'}
               </button>
               <div className="forgot-link">
-                <a href="#">Forgot password?</a>
+                <button type="button" className="link-btn" onClick={() => switchMode('reset')}>
+                  Forgot password?
+                </button>
               </div>
             </form>
           )}
 
-          {mode === 'signup' && !signUpSuccess && (
+          {!passwordRecovery && mode === 'signup' && !signUpSuccess && (
             <form onSubmit={handleSignUp}>
               <div className="field">
-                <label>EMAIL</label>
+                <label htmlFor="su-email">EMAIL</label>
                 <input
+                  id="su-email"
                   type="email"
                   placeholder="you@email.com"
                   value={email}
@@ -139,8 +267,9 @@ export default function Authenticate() {
                 />
               </div>
               <div className="field">
-                <label>PASSWORD</label>
+                <label htmlFor="su-password">PASSWORD</label>
                 <input
+                  id="su-password"
                   type="password"
                   placeholder="minimum eight characters"
                   value={password}
@@ -151,8 +280,9 @@ export default function Authenticate() {
               </div>
               <div className="riot-id-row">
                 <div className="field">
-                  <label>RIOT GAME NAME</label>
+                  <label htmlFor="su-riot-name">RIOT GAME NAME</label>
                   <input
+                    id="su-riot-name"
                     type="text"
                     placeholder="YourName"
                     value={riotName}
@@ -160,10 +290,11 @@ export default function Authenticate() {
                     required
                   />
                 </div>
-                <div className="riot-id-hash">#</div>
+                <div className="riot-id-hash" aria-hidden="true">#</div>
                 <div className="field">
-                  <label>TAG</label>
+                  <label htmlFor="su-riot-tag">TAG</label>
                   <input
+                    id="su-riot-tag"
                     type="text"
                     placeholder="NA1"
                     value={riotTag}
@@ -178,7 +309,7 @@ export default function Authenticate() {
             </form>
           )}
 
-          {mode === 'signup' && signUpSuccess && (
+          {!passwordRecovery && mode === 'signup' && signUpSuccess && (
             <div className="auth-success">
               <div className="eyebrow eyebrow-green">IDENTITY LOGGED</div>
               <p>

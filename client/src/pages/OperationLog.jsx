@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { MOCK_OPERATIONS, isMockCell } from '../lib/mockData'
@@ -131,6 +131,7 @@ export default function OperationLog() {
   const { user, activeCell } = useAuth()
   const [operations, setOperations] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [filterMode, setFilterMode] = useState('All')
@@ -142,21 +143,39 @@ export default function OperationLog() {
   const hasCell = !!(user && activeCell)
   const hasData = operations && operations.length > 0
 
+  // Monotonic token: a slow response for a previously viewed cell must never
+  // overwrite the current cell's log (cell-switch race).
+  const fetchSeq = useRef(0)
+
   const fetchOps = useCallback(async () => {
     if (!cellId) return
+    const seq = ++fetchSeq.current
     setLoading(true)
+    setFetchError(null)
     try {
-      if (isMockCell(cellId)) {
-        setOperations(MOCK_OPERATIONS)
-      } else {
-        const data = await api.getOperationLog(cellId)
-        setOperations(data)
+      const data = isMockCell(cellId) ? MOCK_OPERATIONS : await api.getOperationLog(cellId)
+      if (seq === fetchSeq.current) setOperations(data)
+    } catch (err) {
+      if (seq === fetchSeq.current) {
+        setOperations(null)
+        setFetchError(err)
       }
-    } catch {
-      setOperations(null)
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) setLoading(false)
     }
+  }, [cellId])
+
+  // Switching cells resets everything cell-specific: the previous cell's
+  // filters would otherwise ghost-filter the new cell's log (stale operator
+  // names, possibly a game mode the new cell never played).
+  useEffect(() => {
+    setOperations(null)
+    setSyncResult(null)
+    setFetchError(null)
+    setFilterMode('All')
+    setFilterOutcome('All')
+    setFilterScope('full')
+    setActiveOperators(null)
   }, [cellId])
 
   useEffect(() => {
@@ -180,10 +199,10 @@ export default function OperationLog() {
   }
 
   // Build operator list sorted by win rate (highest first)
-  const allOperatorNames = (() => {
+  const allOperatorNames = useMemo(() => {
     const opMap = {}
     for (const op of (operations ?? [])) {
-      for (const p of op.participants) {
+      for (const p of (op.participants ?? [])) {
         if (!p.name) continue
         if (!opMap[p.name]) opMap[p.name] = { wins: 0, games: 0 }
         opMap[p.name].games++
@@ -193,13 +212,16 @@ export default function OperationLog() {
     return Object.entries(opMap)
       .sort(([, a], [, b]) => (b.games > 0 ? b.wins / b.games : 0) - (a.games > 0 ? a.wins / a.games : 0) || b.games - a.games)
       .map(([name]) => name)
-  })()
+  }, [operations])
 
+  // Initialize the operator filter to "everyone" once the log arrives.
+  // activeOperators resets to null on cell switch (effect above), so this
+  // re-initializes per cell.
   useEffect(() => {
     if (allOperatorNames.length > 0 && activeOperators === null) {
       setActiveOperators(new Set(allOperatorNames))
     }
-  }, [allOperatorNames.length])
+  }, [allOperatorNames, activeOperators])
 
   const currentOps = activeOperators ?? new Set(allOperatorNames)
 
@@ -238,7 +260,7 @@ export default function OperationLog() {
     if (filterOutcome === 'Losses' && op.cell_members_won) return false
     // Scope: 'full' = all joint deployments; 'roster' = exact operator match
     if (filterScope === 'roster' && activeOperators !== null) {
-      const opNames = op.participants.map((p) => p.name)
+      const opNames = (op.participants ?? []).map((p) => p.name)
       // Every participant must be selected (no unselected in game)
       if (!opNames.every((n) => currentOps.has(n))) return false
       // Every selected operator must be a participant (all selected were present)
@@ -306,7 +328,7 @@ export default function OperationLog() {
               )}
             </div>
             {syncResult && (
-              <div className="sync-result">
+              <div className="sync-result" role="status">
                 {syncResult.status === 'ERROR'
                   ? `SYNC FAILED: ${syncResult.message}`
                   : syncResult.remaining > 0
@@ -318,7 +340,28 @@ export default function OperationLog() {
         </div>
       </div>
 
-      <div className={`page-content${hasCell && !operations ? ' loading' : ''}`}>
+      <div className={`page-content${hasCell && !operations && !fetchError ? ' loading' : ''}`}>
+
+        {/* ── FETCH FAILURE NOTICE (distinct from loading) ── */}
+        {hasCell && fetchError && !operations && (
+          <div className="card fetch-error-card" role="alert">
+            <div className="fetch-error-title">
+              {fetchError.status === 401 ? 'CLEARANCE EXPIRED' : 'RETRIEVAL FAULT'}
+            </div>
+            <p className="fetch-error-note">
+              {fetchError.status === 401
+                ? 'Session credentials have lapsed. Re-authenticate to restore log access.'
+                : 'The operation log could not be retrieved. This is a transmission fault — records remain intact.'}
+            </p>
+            {fetchError.status === 401 ? (
+              <a className="fetch-error-btn" href="/authenticate?return_to=/oplog">RE-AUTHENTICATE</a>
+            ) : (
+              <button className="fetch-error-btn" onClick={fetchOps} disabled={loading}>
+                {loading ? 'RETRYING...' : 'RE-ATTEMPT RETRIEVAL'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── SUMMARY STRIP ── */}
         <div className="summary-strip intel-stagger">
@@ -485,7 +528,7 @@ export default function OperationLog() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...op.participants].sort((a, b) => {
+                        {[...(op.participants ?? [])].sort((a, b) => {
                           // SR games with assigned lanes: top -> jungle -> mid -> bot -> support
                           if (a.role in ROLE_ORDER && b.role in ROLE_ORDER) {
                             return ROLE_ORDER[a.role] - ROLE_ORDER[b.role]

@@ -26,7 +26,12 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || 'Request failed')
+    // Carry the HTTP status so callers can tell an expired session (401)
+    // apart from a server failure and route to re-authentication.
+    const e = new Error(err.error || 'Request failed')
+    e.status = res.status
+    e.code = err.code
+    throw e
   }
 
   return res.json()
@@ -69,7 +74,10 @@ export const api = {
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }))
-      throw new Error(err.error || 'Validation failed')
+      const e = new Error(err.error || 'Validation failed')
+      e.status = res.status
+      e.code = err.code
+      throw e
     }
     return res.json()
   },

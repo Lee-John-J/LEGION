@@ -74,16 +74,71 @@ async function requireAuth(req, res, next) {
   next()
 }
 
-// POST /operators/validate-riot-id — public pre-signup check (no auth required)
-router.post('/validate-riot-id', async (req, res) => {
+// ── Abuse guards for the public validate endpoint ────────────────
+// validate-riot-id must stay unauthenticated (it runs BEFORE signup), but
+// every call costs a Riot API request from the shared quota. Two guards:
+// a per-IP throttle and a short result cache. Both are in-memory and
+// per-serverless-instance — they bound bursts, not a global guarantee.
+
+const validateHits = new Map() // ip -> { count, windowStart }
+const VALIDATE_WINDOW_MS = 60_000
+const VALIDATE_MAX_PER_WINDOW = 10
+
+function throttleValidate(req, res, next) {
+  const ip = String(req.headers['x-forwarded-for'] ?? req.ip ?? 'unknown').split(',')[0].trim()
+  const now = Date.now()
+  const entry = validateHits.get(ip)
+  if (!entry || now - entry.windowStart > VALIDATE_WINDOW_MS) {
+    if (validateHits.size > 5000) validateHits.clear() // bound memory
+    validateHits.set(ip, { count: 1, windowStart: now })
+    return next()
+  }
+  entry.count++
+  if (entry.count > VALIDATE_MAX_PER_WINDOW) {
+    return res.status(429).json({ code: 'RATE_LIMITED', error: 'INTAKE QUEUE SATURATED. STAND BY, THEN RE-SUBMIT.' })
+  }
+  next()
+}
+
+const validateCache = new Map() // "name#tag" lowercased -> { hit, ts }
+const VALIDATE_CACHE_TTL = 5 * 60 * 1000
+
+function getCachedValidation(key) {
+  const entry = validateCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.ts > VALIDATE_CACHE_TTL) {
+    validateCache.delete(key)
+    return null
+  }
+  return entry.hit
+}
+
+// POST /operators/validate-riot-id — public pre-signup check (no auth required,
+// so it is throttled per IP and results are cached — see guards above)
+router.post('/validate-riot-id', throttleValidate, async (req, res) => {
   const { riotGameName, riotTagLine } = req.body
   if (!riotGameName || !riotTagLine) {
     return res.status(400).json({ error: 'RIOT ID REQUIRED: gameName + tagLine' })
   }
+
+  const cacheKey = `${riotGameName}#${riotTagLine}`.toLowerCase()
+  const cached = getCachedValidation(cacheKey)
+  if (cached) {
+    if (cached.valid) return res.json(cached)
+    return res.status(404).json({ code: 'RIOT_ID_NOT_FOUND', error: 'INTAKE FAILED. RIOT ID NOT FOUND.' })
+  }
+
   try {
     const account = await lookupRiotAccount(riotGameName, riotTagLine)
-    res.json({ valid: true, gameName: account.gameName, tagLine: account.tagLine })
+    const hit = { valid: true, gameName: account.gameName, tagLine: account.tagLine }
+    validateCache.set(cacheKey, { hit, ts: Date.now() })
+    res.json(hit)
   } catch (err) {
+    // Cache only the stable outcome (the ID genuinely doesn't exist);
+    // transient Riot failures should retry on the next attempt.
+    if (err.kind === 'NOT_FOUND') {
+      validateCache.set(cacheKey, { hit: { valid: false }, ts: Date.now() })
+    }
     return sendRiotError(res, err)
   }
 })
@@ -94,6 +149,24 @@ router.post('/link', requireAuth, async (req, res) => {
     const { riotGameName, riotTagLine } = req.body
     if (!riotGameName || !riotTagLine) {
       return res.status(400).json({ error: 'RIOT ID REQUIRED: gameName + tagLine' })
+    }
+
+    // Short-circuit: the client pings /link on every page load (see
+    // useAuth.linkRiotIdIfNeeded). When this user's operator row already
+    // matches the requested Riot ID, skip the Riot API call and DB writes
+    // entirely — otherwise every refresh burns shared Riot quota.
+    const { data: current } = await sb
+      .from('operators')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .single()
+
+    if (
+      current?.is_verified &&
+      current.riot_game_name?.toLowerCase() === String(riotGameName).toLowerCase() &&
+      current.riot_tag_line?.toLowerCase() === String(riotTagLine).toLowerCase()
+    ) {
+      return res.json(current)
     }
 
     let account

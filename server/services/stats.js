@@ -64,10 +64,17 @@ function getSameTeamCellGroup(participants, puuidSet) {
   const cellParticipants = participants.filter((p) => puuidSet.has(p.puuid))
   if (cellParticipants.length < 2) return null
 
-  // Group cell members by teamId (Riot API: 100 = blue, 200 = red)
+  // Arena (CHERRY) lobbies are 8 subteams of 2, but Riot still stamps only
+  // two teamIds — so cell members sharing a teamId can be OPPONENTS. Riot
+  // sets playerSubteamId 1-8 only in Arena (0 elsewhere), so its presence is
+  // the Arena signal; group by subteam there. Mirrors routes/cells.js
+  // /operations, which keys the same decision off gameMode === 'CHERRY'.
+  const isArena = participants.some((p) => (p.playerSubteamId ?? 0) > 0)
+
+  // Group cell members by team (Riot API: 100 = blue, 200 = red) or subteam
   const byTeam = {}
   for (const p of cellParticipants) {
-    const tid = p.teamId
+    const tid = isArena ? p.playerSubteamId : p.teamId
     if (!byTeam[tid]) byTeam[tid] = []
     byTeam[tid].push(p)
   }
@@ -82,8 +89,25 @@ function getSameTeamCellGroup(participants, puuidSet) {
   return best
 }
 
+/**
+ * Remakes (early-surrender voids) must not count as real games — a 3-minute
+ * remake would otherwise register as a full loss in WR, streaks, and the
+ * Campaign Record. Modern match-v5 sets gameEndedInEarlySurrender on the
+ * participants; the duration floor catches anything that slips past it
+ * (post-patch-11.20 gameDuration is in seconds).
+ */
+function isRemake(match) {
+  const info = match.info ?? {}
+  if ((info.participants ?? []).some((p) => p.gameEndedInEarlySurrender)) return true
+  const dur = info.gameDuration ?? 0
+  return dur > 0 && dur < 300
+}
+
 function computeCellStats(matches, cellPuuids, memberRoster = []) {
   const puuidSet = new Set(cellPuuids)
+
+  // Drop remakes before computing anything — they are voided games.
+  matches = matches.filter((m) => !isRemake(m))
 
   // Joint match = 2+ cell members on the SAME team
   const jointMatches = matches.filter((m) => {
@@ -295,7 +319,8 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       name: member.riot_game_name ?? 'UNKNOWN',
       games: 0,
       wins: 0,
-      win_rate: 0,
+      // null, not 0: "no joint games yet" must not render as a 0.0% win rate
+      win_rate: null,
       wr_without: jointMatches.length > 0 ? jointWins / jointMatches.length : null,
       top_champions: [],
       unique_champions: 0,
@@ -744,11 +769,15 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     }
 
     // ─── TYPE: LATE-NIGHT OPERATOR ───
+    // UTC hours 5-10 ≈ the overnight window for NA players. The copy below
+    // deliberately says "overnight window", NOT a local-time range — the
+    // server doesn't know each viewer's timezone, so naming exact local
+    // hours here would assert facts that are wrong for most users.
     const lateNightGames = jointMatches.filter((m) => {
       const ts = m.info?.gameEndTimestamp ?? m.info?.gameStartTimestamp
       if (!ts) return false
       const hour = new Date(ts).getUTCHours()
-      return hour >= 5 && hour < 10 // ~midnight–5am EST in UTC
+      return hour >= 5 && hour < 10
     })
     if (lateNightGames.length >= 3) {
       const lateWins = lateNightGames.filter((m) => {
@@ -757,9 +786,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       }).length
       const lateWR = lateWins / lateNightGames.length
       const note = pickIdx([
-        `${lateNightGames.length} deployments logged between 0000 and 0500 local. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `Performance falls ${(((overallWR - lateWR) * 100).toFixed(0))} points below cell baseline during this window. Degradation is assessed as PROBABLY fatigue-related.` : `Performance during this window meets or exceeds cell baseline. Contributing factors are undetermined. Surveillance continues.`}`,
-        `Late-window activity: ${lateNightGames.length} joint operations between 0000 and 0500 hours. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < 0.45 ? 'Outcome data for this period is unfavorable. Operational judgment during late-window sessions is assessed as PROBABLY impaired.' : 'Late-window performance is within acceptable parameters. No corrective assessment warranted at this time.'}`,
-        `${lateNightGames.length} after-hours deployments on file (0000–0500). WR during this window: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `A ${(((overallWR - lateWR) * 100).toFixed(0))}-point gap versus cell baseline suggests cognitive or coordination degradation. Analyst assessment: fatigue is PROBABLY a factor.` : 'Performance is stable relative to daytime operations. No evidence of impairment detected in this sample.'}`,
+        `${lateNightGames.length} deployments logged in the overnight window. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `Performance falls ${(((overallWR - lateWR) * 100).toFixed(0))} points below cell baseline during this window. Degradation is assessed as PROBABLY fatigue-related.` : `Performance during this window meets or exceeds cell baseline. Contributing factors are undetermined. Surveillance continues.`}`,
+        `Late-window activity: ${lateNightGames.length} joint operations in the overnight window. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < 0.45 ? 'Outcome data for this period is unfavorable. Operational judgment during late-window sessions is assessed as PROBABLY impaired.' : 'Late-window performance is within acceptable parameters. No corrective assessment warranted at this time.'}`,
+        `${lateNightGames.length} after-hours deployments on file. WR during this window: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `A ${(((overallWR - lateWR) * 100).toFixed(0))}-point gap versus cell baseline suggests cognitive or coordination degradation. Analyst assessment: fatigue is PROBABLY a factor.` : 'Performance is stable relative to daytime operations. No evidence of impairment detected in this sample.'}`,
       ], 9)
       candidates.push({ weight: Math.abs(lateWR - overallWR) * 60 + lateNightGames.length, obs: {
         severity: lateWR < overallWR - 0.1 ? 'amber' : 'blue',
@@ -901,4 +930,4 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
   }
 }
 
-module.exports = { computeCellStats }
+module.exports = { computeCellStats, isRemake, getSameTeamCellGroup }

@@ -1,8 +1,9 @@
 const express = require('express')
+const crypto = require('crypto')
 const router = express.Router()
 const { supabase } = require('../db/supabase')
 const { getAccountByRiotId, getMatchIdsPaginated, getMatch } = require('../services/riot')
-const { computeCellStats } = require('../services/stats')
+const { computeCellStats, isRemake } = require('../services/stats')
 
 // ── Auth middleware ──────────────────────────────────────────────
 
@@ -19,12 +20,34 @@ async function requireAuth(req, res, next) {
 // ── Helper: generate LGN-XXXX-XXXX invite code ─────────────────
 
 function generateInviteCode() {
+  // crypto.randomInt, not Math.random: invite codes are bearer credentials,
+  // so they must not come from a predictable PRNG.
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const pick = () => chars[crypto.randomInt(chars.length)]
   let code = 'LGN-'
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < 4; i++) code += pick()
   code += '-'
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < 4; i++) code += pick()
   return code
+}
+
+// ── Helper: per-user throttle for invite-code join attempts ─────
+// In-memory and per-serverless-instance: bounds guessing bursts rather than
+// providing a global guarantee, which is proportionate for a 32^8 keyspace.
+const joinAttempts = new Map() // userId -> { count, windowStart }
+const JOIN_WINDOW_MS = 60_000
+const JOIN_MAX_PER_WINDOW = 10
+
+function allowJoinAttempt(userId) {
+  const now = Date.now()
+  const entry = joinAttempts.get(userId)
+  if (!entry || now - entry.windowStart > JOIN_WINDOW_MS) {
+    if (joinAttempts.size > 5000) joinAttempts.clear() // bound memory
+    joinAttempts.set(userId, { count: 1, windowStart: now })
+    return true
+  }
+  entry.count++
+  return entry.count <= JOIN_MAX_PER_WINDOW
 }
 
 // ── Helper: verify user is a member of the cell ─────────────────
@@ -73,20 +96,31 @@ function currentSeasonStartEpoch() {
 }
 
 // ── Helper: fetch matches from DB that overlap with any of these PUUIDs ──
-// Filters to current season only using the match's gameStartTimestamp.
+// Filters to the current season via the match's gameStartTimestamp (epoch
+// millis inside the raw JSONB), and pages past PostgREST's silent 1000-row
+// response cap so long histories don't quietly lose their oldest games.
 
 async function getStoredMatches(sb, puuids) {
-  const { data, error } = await sb
-    .from('matches')
-    .select('match_id, match_data')
-    .overlaps('participants_puuids', puuids)
-    .order('fetched_at', { ascending: false })
+  const seasonStartMs = currentSeasonStart().getTime()
+  const PAGE = 1000
+  const rows = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from('matches')
+      .select('match_id, match_data')
+      .overlaps('participants_puuids', puuids)
+      .gte('match_data->info->gameStartTimestamp', seasonStartMs)
+      .order('fetched_at', { ascending: false })
+      .range(from, from + PAGE - 1)
 
-  if (error) {
-    console.error('[LEGION] Match query error:', error.message)
-    return []
+    if (error) {
+      console.error('[LEGION] Match query error:', error.message)
+      break
+    }
+    rows.push(...(data ?? []))
+    if (!data || data.length < PAGE) break
   }
-  return data ?? []
+  return rows
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -147,8 +181,11 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /api/cells — create a new cell
 router.post('/', requireAuth, async (req, res) => {
   const sb = supabase
-  const { name } = req.body
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : ''
   if (!name) return res.status(400).json({ error: 'CELL DESIGNATION REQUIRED' })
+  if (name.length > 64) {
+    return res.status(400).json({ error: 'CELL DESIGNATION EXCEEDS 64 CHARACTERS' })
+  }
 
   const invite_code = generateInviteCode()
 
@@ -163,10 +200,18 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'DATABASE ERROR' })
   }
 
-  // Auto-add creator as member
-  await sb
+  // Auto-add creator as member — if this fails the creator can't even see
+  // their own cell (GET /:id checks membership), so roll the cell back
+  // rather than orphan it.
+  const { error: memberError } = await sb
     .from('cell_members')
     .insert({ cell_id: cell.id, user_id: req.user.id })
+
+  if (memberError) {
+    console.error('[LEGION] DB error adding creator membership:', memberError.message)
+    await sb.from('cells').delete().eq('id', cell.id)
+    return res.status(500).json({ error: 'DATABASE ERROR' })
+  }
 
   res.json({ ...cell, member_count: 1 })
 })
@@ -210,13 +255,25 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
   const { invite_code } = req.body
   if (!invite_code) return res.status(400).json({ error: 'INVITE CODE REQUIRED' })
 
+  // Invite codes are bearer credentials — cap guess attempts per user.
+  if (!allowJoinAttempt(req.user.id)) {
+    return res.status(429).json({ error: 'TOO MANY INTAKE ATTEMPTS. STAND BY, THEN RE-SUBMIT.' })
+  }
+
+  const code = String(invite_code).trim().toUpperCase()
+  if (!/^LGN-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
+    // Same message as an unknown code so the response doesn't distinguish
+    // "badly formatted" from "not found".
+    return res.status(404).json({ error: 'INVITE CODE INVALID OR EXPIRED' })
+  }
+
   const sb = supabase
 
   // Look up cell by invite code
   const { data: cell, error: cellError } = await sb
     .from('cells')
     .select('id, name')
-    .eq('invite_code', invite_code.trim())
+    .eq('invite_code', code)
     .single()
 
   if (cellError || !cell) {
@@ -504,8 +561,9 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       game_mode_breakdown: [],
       operator_stats: fullRoster.map((m) => ({
         puuid: m.puuid,
+        user_id: m.id,
         name: m.riot_game_name ?? 'UNKNOWN',
-        games: 0, wins: 0, win_rate: 0, wr_without: null,
+        games: 0, wins: 0, win_rate: null, wr_without: null,
         top_champions: [], unique_champions: 0,
       })),
     })
@@ -568,6 +626,9 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
   const operations = []
   for (const row of matchRows) {
     const match = row.match_data
+    // Skip remakes here too so the Operation Log (and its summary strip)
+    // agrees with the Briefing's stats engine, which also excludes them.
+    if (isRemake(match)) continue
     const participants = match.info?.participants ?? []
     const allCellInMatch = participants.filter((p) => puuidSet.has(p.puuid))
 
