@@ -6,18 +6,29 @@ import CellOverlay from '../components/CellOverlay'
 import CampaignRecord from '../components/CampaignRecord'
 import Footer from '../components/Footer'
 
-/* ── Redacted placeholder helpers ── */
+/* ── Redacted placeholder helpers ──
+   aria-hidden + sr-only text: a screen reader hears "[redacted]" instead of
+   a dangling label followed by silence. */
 function R({ w, h = 12 }) {
   return (
-    <span
-      className="redacted-inline"
-      style={{ width: w, height: h, padding: 0, verticalAlign: 'middle' }}
-    />
+    <>
+      <span
+        className="redacted-inline"
+        aria-hidden="true"
+        style={{ width: w, height: h, padding: 0, verticalAlign: 'middle' }}
+      />
+      <span className="sr-only">[redacted]</span>
+    </>
   )
 }
 
 function RedactedBar({ w = '100%', h = 12 }) {
-  return <div className="redacted-bar" style={{ width: w, height: h }} />
+  return (
+    <>
+      <div className="redacted-bar" aria-hidden="true" style={{ width: w, height: h }} />
+      <span className="sr-only">[redacted]</span>
+    </>
+  )
 }
 
 /* ── Formatting helpers ── */
@@ -113,18 +124,24 @@ function renderPoolBar(champs, totalGames, uniqueCount) {
     if (adj !== 0) pcts[0] += adj
   }
   return <>
+    {/* Screen-reader alternative for the hover-only segment tooltips */}
+    <span className="sr-only">
+      {shownChamps.map((c) =>
+        `${c.name}: ${Math.round((c.games / totalGames) * 100)} percent of picks, ${Math.round((c.win_rate ?? 0) * 100)} percent win rate`
+      ).join('; ')}
+    </span>
     {shownChamps.map((c, idx) => {
       const segPct = Math.round((c.games / totalGames) * 100)
       const shade = pickShade(segPct)
       const wr = Math.round((c.win_rate ?? 0) * 100)
       const tooltip = `${c.name} — ${segPct}% pick rate // ${wr}% WR (${c.wins ?? 0}W-${c.games - (c.wins ?? 0)}L)`
       return (
-        <div key={c.name} className={`pool-seg ${shade}`}
+        <div key={c.name} className={`pool-seg ${shade}`} aria-hidden="true"
           style={{ width: `${pcts[idx]}%` }} data-tooltip={tooltip}><span className="pool-seg-label">{c.name.toUpperCase()}</span></div>
       )
     })}
     {hasRemainder && (
-      <div className="pool-seg s-empty" style={{ width: `${remainder}%` }}>
+      <div className="pool-seg s-empty" aria-hidden="true" style={{ width: `${remainder}%` }}>
         {hiddenCount > 0 ? `+${hiddenCount} more` : ''}
       </div>
     )}
@@ -132,7 +149,8 @@ function renderPoolBar(champs, totalGames, uniqueCount) {
 }
 
 /* ── Link Analysis SVG ── */
-// 5-tier edge color matching Game Mode Breakdown
+// 5-tier edge color matching Game Mode Breakdown (LINES only — the mid
+// shades fail contrast as text, see linkTextColor)
 function linkEdgeColor(wrPct) {
   if (wrPct >= 62) return 'var(--green)'
   if (wrPct > 50) return '#16a34a'
@@ -140,9 +158,16 @@ function linkEdgeColor(wrPct) {
   return 'var(--red)'
 }
 
+// Text drawn on the card always uses the dark tier colors (WCAG 1.4.3)
+function linkTextColor(wrPct) {
+  if (wrPct > 50) return 'var(--green)'
+  if (wrPct === 50) return 'var(--muted)'
+  return 'var(--red)'
+}
+
 // CIA-style bond classification
 function classifyBond(games, wrPct) {
-  if (games === 0) return { label: 'UNLINKED', color: 'var(--muted-light)' }
+  if (games === 0) return { label: 'UNLINKED', color: 'var(--muted)' }
   if (games < 5)   return { label: 'EMERGING', color: 'var(--muted)' }
   if (wrPct >= 58 && games >= 15) return { label: 'CORE', color: 'var(--green)' }
   if (wrPct >= 50) return { label: 'STABLE', color: 'var(--muted)' }
@@ -157,7 +182,8 @@ function buildLinkSVG(ops, duoStats) {
   const active = ops.filter(op => op.games >= ACTIVE_THRESHOLD)
   const inactive = ops.filter(op => op.games < ACTIVE_THRESHOLD)
 
-  const n = Math.min(active.length, 7)
+  // Spec allows 10 operators per cell — every active operator gets a node
+  const n = Math.min(active.length, 10)
   if (n < 1) return null
 
   // Build a lookup from duo_stats for quick pair matching
@@ -185,18 +211,25 @@ function buildLinkSVG(ops, duoStats) {
         const wr = duo.win_rate <= 1 ? duo.win_rate * 100 : duo.win_rate
         const wrRound = Math.round(wr)
         const stroke = wrRound === 50 ? 'var(--muted)' : linkEdgeColor(wr)
+        const textColor = linkTextColor(wrRound)
         const bond = classifyBond(duo.games, wrRound)
         // Thickness: 1px base + up to 2.5px scaled by game share
         const width = 1 + (duo.games / maxGames) * 2.5
-        edges.push({ i1: i, i2: j, stroke, wr: wrRound, games: duo.games,
+        edges.push({ i1: i, i2: j, stroke, textColor, wr: wrRound, games: duo.games,
           dashed: duo.games < 10, width, bond, noData: false })
       } else {
         const bond = classifyBond(0, 0)
-        edges.push({ i1: i, i2: j, stroke: 'var(--muted-light)', wr: null,
-          games: 0, dashed: true, width: 0.5, bond, noData: true })
+        edges.push({ i1: i, i2: j, stroke: 'var(--muted-light)', textColor: 'var(--muted)',
+          wr: null, games: 0, dashed: true, width: 0.5, bond, noData: true })
       }
     }
   }
+
+  // Plain-text pair summary for screen readers (the SVG itself is role="img")
+  const pairSummary = edges
+    .filter((e) => !e.noData)
+    .map((e) => `${active[e.i1].name} and ${active[e.i2].name}: ${e.wr}% over ${e.games} games`)
+    .join('; ')
 
   // ── Layout: ring on a fixed canvas — the SVG scales it to fit the panel.
   // r pushes close to the canvas edge; name labels are clamped inside, so
@@ -220,7 +253,7 @@ function buildLinkSVG(ops, duoStats) {
     return { x: cx + (r + 45) * Math.cos(angle), y: cy + (r + 45) * Math.sin(angle) }
   })
 
-  return { active, inactive, positions, inactivePositions, edges, n, cx, cy, boxW: 400, boxH: 370 }
+  return { active, inactive, positions, inactivePositions, edges, pairSummary, n, cx, cy, boxW: 400, boxH: 370 }
 }
 
 export default function Briefing() {
@@ -334,9 +367,19 @@ export default function Briefing() {
     const reordered = [1, 2, 3, 4, 5, 6, 0].map(i => localMap[i])
     const max = Math.max(1, ...reordered.flat())
 
+    // Peak window — surfaced as a visible caption and in the SR summary, so
+    // the headline fact isn't locked behind 168 hover-only cells
+    let peak = { di: 0, hour: 0, count: 0 }
+    reordered.forEach((row, di) => row.forEach((c, hour) => {
+      if (c > peak.count) peak = { di, hour, count: c }
+    }))
+    const hourLabel = (h) => (h === 0 ? '12AM' : h < 12 ? `${h}AM` : h === 12 ? '12PM' : `${h - 12}PM`)
+    const peakLabel = peak.count > 0 ? `${DAYS[peak.di]} ${hourLabel(peak.hour)}` : null
+    const total = reordered.flat().reduce((a, b) => a + b, 0)
+
     // Timezone label
     const tzAbbr = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()
-    return { DAYS, rows: reordered, max, tzAbbr }
+    return { DAYS, rows: reordered, max, tzAbbr, peakLabel, total }
   }, [hasData, stats])
 
   // Heatmap cell intensity class
@@ -589,15 +632,17 @@ export default function Briefing() {
             </div>
           </div>
 
-          {/* Operator table */}
+          {/* Operator table — scroll container keeps 320px screens from
+              scrolling the whole page sideways */}
+          <div className="table-scroll">
           <table className="cm-table">
             <thead>
               <tr>
-                <th>OPERATOR</th>
-                <th>STATUS</th>
-                <th>GAMES (SEASON)</th>
-                <th>WIN RATE</th>
-                <th>CELL WR WITHOUT &mdash;</th>
+                <th scope="col">OPERATOR</th>
+                <th scope="col">STATUS</th>
+                <th scope="col">GAMES (SEASON)</th>
+                <th scope="col">WIN RATE</th>
+                <th scope="col">CELL WR WITHOUT &mdash;</th>
               </tr>
             </thead>
             <tbody>
@@ -664,13 +709,14 @@ export default function Briefing() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* ════════════════════════════
             GAME MODE BREAKDOWN
             ════════════════════════════ */}
         <div className="card mode-panel intel-reveal reveal-d1">
-          <div className="panel-title">Game Mode Breakdown</div>
+          <h2 className="panel-title">Game Mode Breakdown</h2>
           <div className="panel-subtitle">Win rate and activity by mode (current season)</div>
 
           {/* Axis tick labels */}
@@ -766,7 +812,7 @@ export default function Briefing() {
 
           {/* Link Analysis — pair network graph */}
           <div className="card vis-panel">
-            <div className="panel-title">Link Analysis</div>
+            <h2 className="panel-title">Link Analysis</h2>
             <div className="panel-subtitle">Joint win rate by operator pair. Hover an operator to isolate their links.</div>
             <div className="panel-body">
               <div className="link-svg-wrap">
@@ -775,6 +821,8 @@ export default function Briefing() {
                     className="link-svg data-reveal"
                     viewBox={`0 0 ${linkData.boxW} ${linkData.boxH}`}
                     xmlns="http://www.w3.org/2000/svg"
+                    role="img"
+                    aria-label={`Joint win rate by operator pair. ${linkData.pairSummary || 'No pair data on file yet.'}`}
                   >
                     {/* Edges — complete graph; stats appear on hover only */}
                     {linkData.edges.map((e, i) => {
@@ -807,7 +855,7 @@ export default function Briefing() {
                               <text x={midX} y={midY + (isHot ? -3 : 3)} textAnchor="middle"
                                 fontFamily="Courier Prime, monospace"
                                 fontSize={isHot ? 15 : 9.5}
-                                fontWeight="700" fill={e.stroke}>
+                                fontWeight="700" fill={e.textColor}>
                                 {e.wr}%
                               </text>
                               {isHot && (
@@ -829,7 +877,7 @@ export default function Briefing() {
                           {e.noData && isHot && (
                             <text x={midX} y={midY + 4} textAnchor="middle"
                               fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
-                              letterSpacing="1" fill="var(--muted-light)" opacity={0.5}>
+                              letterSpacing="1" fill="var(--muted)" opacity={0.8}>
                               UNLINKED
                             </text>
                           )}
@@ -857,8 +905,24 @@ export default function Briefing() {
                       const nodeDim = hoverOp !== null && hoverOp !== i
                       return (
                         <g key={op.puuid || i} className="link-el" opacity={nodeDim ? 0.5 : 1}
+                          tabIndex={0}
+                          role="button"
+                          aria-pressed={hoverOp === i}
+                          aria-label={`Isolate ${op.name}'s links`}
                           onMouseEnter={() => setHoverOp(i)}
-                          onMouseLeave={() => setHoverOp(null)}>
+                          onMouseLeave={() => setHoverOp(null)}
+                          onFocus={() => setHoverOp(i)}
+                          onBlur={() => setHoverOp(null)}
+                          onPointerDown={(e) => {
+                            // Touch has no hover — a tap toggles isolation
+                            if (e.pointerType === 'touch') setHoverOp(hoverOp === i ? null : i)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setHoverOp(hoverOp === i ? null : i)
+                            }
+                          }}>
                           {/* Invisible hit area so the hover target is generous */}
                           <circle cx={p.x} cy={p.y} r={22} fill="transparent" />
                           {/* Crosshair arms */}
@@ -916,12 +980,19 @@ export default function Briefing() {
 
           {/* Activity Heatmap */}
           <div className="card vis-panel">
-            <div className="panel-title">Activity Heatmap</div>
-            <div className="panel-subtitle">When the cell deploys together{heatmapData ? ` — ${heatmapData.tzAbbr}` : ''}</div>
+            <h2 className="panel-title">Activity Heatmap</h2>
+            <div className="panel-subtitle">
+              When the cell deploys together{heatmapData ? ` — ${heatmapData.tzAbbr}` : ''}
+              {heatmapData?.peakLabel ? ` // PEAK ${heatmapData.peakLabel}` : ''}
+            </div>
             <div className="panel-body">
               {heatmapData ? (
                 <div className="data-reveal heatmap-stack">
-                  <div className="heatmap-grid">
+                  <div
+                    className="heatmap-grid"
+                    role="img"
+                    aria-label={`Activity heatmap in ${heatmapData.tzAbbr}: ${heatmapData.total} joint deployments across the season${heatmapData.peakLabel ? `, peaking ${heatmapData.peakLabel}` : ''}.`}
+                  >
                     {heatmapData.DAYS.flatMap((day, di) => [
                         <div key={`day-label-${di}`} className="heatmap-day-label">{day}</div>,
                         ...heatmapData.rows[di].map((count, hour) => {
@@ -961,7 +1032,7 @@ export default function Briefing() {
             ════════════════════════════ */}
         <div className="card fun-card intel-reveal reveal-d3">
           <div className="fun-label">&bull; Trend Analysis</div>
-          <div className="fun-title">Campaign Record</div>
+          <h2 className="fun-title">Campaign Record</h2>
           <div className="fun-subtitle">Rolling 20-game win rate across the season</div>
           <div className="fun-body">
             <CampaignRecord timeline={hasData ? stats.timeline : null} />
@@ -982,7 +1053,7 @@ export default function Briefing() {
             ════════════════════════════ */}
         <div className="card fun-card pools-card intel-reveal reveal-d5">
           <div className="fun-label">&bull; Operator Profiles</div>
-          <div className="fun-title">Champion Pools</div>
+          <h3 className="fun-title">Champion Pools</h3>
           <div className="fun-subtitle">Champion selection patterns, by subject and theater</div>
           <div className="fun-body">
             <div className="pools-grid">
@@ -1158,7 +1229,7 @@ export default function Briefing() {
         <div className="analyst-bottom intel-reveal reveal-d6">
           <div className="card fun-card">
             <div className="fun-label">&bull; Field Assessment</div>
-            <div className="fun-title">Analyst Observations</div>
+            <h3 className="fun-title">Analyst Observations</h3>
             <div className="fun-subtitle">Judgments compiled from current season match data</div>
             <div className="fun-body">
               <div className="assessment-list">

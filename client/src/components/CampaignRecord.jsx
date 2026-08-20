@@ -105,12 +105,13 @@ function buildCampaign(timeline) {
     linePath += `${cmd}${xs[i].toFixed(1)},${Y(roll[i]).toFixed(1)} `
   }
 
-  // Win/loss barcode strip — one path per color
+  // Win/loss barcode strip — wins tick UP from the baseline, losses tick
+  // DOWN, so the direction carries the information and color only reinforces
+  // it (roughly one in 12 men cannot tell this red from this green; WCAG 1.4.1).
   let winTicks = '', lossTicks = ''
   for (let i = 0; i < n; i++) {
-    const seg = `M${xs[i].toFixed(1)} 186v10`
-    if (games[i].win) winTicks += seg
-    else lossTicks += seg
+    if (games[i].win) winTicks += `M${xs[i].toFixed(1)} 185v-8`
+    else lossTicks += `M${xs[i].toFixed(1)} 187v8`
   }
 
   return {
@@ -174,8 +175,9 @@ export default function CampaignRecord({ timeline }) {
     <div className="cr-wrap">
       <svg
         className="cr-svg" viewBox="0 0 680 228" xmlns="http://www.w3.org/2000/svg"
-        role="img" aria-label="Rolling win rate across the season, one step per joint deployment"
-        onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label={`Rolling 20-game win rate across the season, one step per joint deployment. Currently ${roll[n - 1]}% after ${n} games. Best run ${best.W.len} wins; worst slump ${best.L.len} losses.`}
+        onMouseMove={handleMove} onClick={handleMove} onMouseLeave={() => setHover(null)}
       >
         <defs>
           <pattern id="crHatch" width="5" height="5" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
@@ -199,7 +201,7 @@ export default function CampaignRecord({ timeline }) {
         {[0, 25, 75, 100].map((v) => (
           <g key={`grid-${v}`}>
             <line x1={44} y1={Y(v)} x2={670} y2={Y(v)} stroke="var(--border-light)" strokeWidth={1} />
-            <text x={40} y={Y(v) + 3} textAnchor="end" fontSize={9} fill="var(--muted-light)" fontFamily="Courier Prime, monospace">{v}%</text>
+            <text x={40} y={Y(v) + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Courier Prime, monospace">{v}%</text>
           </g>
         ))}
         <line x1={44} y1={Y(50)} x2={670} y2={Y(50)} stroke="var(--slate-2)" strokeWidth={1} strokeDasharray="4 4" />
@@ -218,8 +220,9 @@ export default function CampaignRecord({ timeline }) {
           </text>
         ))}
 
-        {/* Trend line + win/loss strip */}
+        {/* Trend line + win/loss strip (wins above the baseline, losses below) */}
         <path d={data.linePath} fill="none" stroke="var(--text)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <line x1={PLOT_LEFT - 2} y1={186} x2={PLOT_RIGHT} y2={186} stroke="var(--slate-2)" strokeWidth={0.75} />
         <path d={data.winTicks} stroke="var(--green)" strokeWidth={2.2} fill="none" />
         <path d={data.lossTicks} stroke="var(--red)" strokeWidth={2.2} fill="none" />
 

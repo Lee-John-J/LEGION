@@ -7,10 +7,14 @@ import Footer from '../components/Footer'
 
 function R({ w, h = 12 }) {
   return (
-    <span
-      className="redacted-block"
-      style={{ width: w, height: h, verticalAlign: 'middle' }}
-    />
+    <>
+      <span
+        className="redacted-block"
+        aria-hidden="true"
+        style={{ width: w, height: h, verticalAlign: 'middle' }}
+      />
+      <span className="sr-only">[redacted]</span>
+    </>
   )
 }
 
@@ -23,14 +27,15 @@ function RedactedMatchRow() {
         <span className="match-duration"><R w={36} h={12} /></span>
         <span className="match-time"><R w={48} h={10} /></span>
       </div>
+      <div className="table-scroll">
       <table className="match-ops">
         <thead>
           <tr>
-            <th>Operator</th>
-            <th>Champion</th>
-            <th>KDA</th>
-            <th className="col-num">Damage</th>
-            <th className="col-num">Gold</th>
+            <th scope="col">Operator</th>
+            <th scope="col">Champion</th>
+            <th scope="col">KDA</th>
+            <th scope="col" className="col-num">Damage</th>
+            <th scope="col" className="col-num">Gold</th>
           </tr>
         </thead>
         <tbody>
@@ -45,6 +50,7 @@ function RedactedMatchRow() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -396,7 +402,9 @@ export default function OperationLog() {
             </div>
           </div>
           <div className="summary-card">
-            <div className="summary-card-accent" style={{ background: 'var(--amber)' }} />
+            {/* Neutral slate, not amber — amber means anomaly in this system
+                and average duration is not one */}
+            <div className="summary-card-accent" style={{ background: 'var(--slate-2)' }} />
             <div className="summary-label">Avg. Duration</div>
             <div className="summary-value">
               {hasData ? formatDuration(avgDuration) : <R w={80} h={36} />}
@@ -421,12 +429,13 @@ export default function OperationLog() {
             </button>
           </div>
           <div className="filter-row">
-            <span className="filter-label">THEATER</span>
-            <div className="filter-chips">
+            <span className="filter-label" id="filter-theater-label">THEATER</span>
+            <div className="filter-chips" role="group" aria-labelledby="filter-theater-label">
               {modes.map((m) => (
                 <button
                   className={`chip${filterMode === m ? ' active' : ''}`}
                   key={m}
+                  aria-pressed={filterMode === m}
                   onClick={() => setFilterMode(m)}
                 >
                   {m}
@@ -435,12 +444,13 @@ export default function OperationLog() {
             </div>
           </div>
           <div className="filter-row">
-            <span className="filter-label">OUTCOME</span>
-            <div className="filter-chips">
+            <span className="filter-label" id="filter-outcome-label">OUTCOME</span>
+            <div className="filter-chips" role="group" aria-labelledby="filter-outcome-label">
               {['All', 'Wins', 'Losses'].map((o) => (
                 <button
                   className={`chip${filterOutcome === o ? ' active' : ''}`}
                   key={o}
+                  aria-pressed={filterOutcome === o}
                   onClick={() => setFilterOutcome(o)}
                 >
                   {o}
@@ -450,10 +460,11 @@ export default function OperationLog() {
           </div>
           {allOperatorNames.length > 0 && (
             <div className="filter-row">
-              <span className="filter-label">OPERATORS</span>
-              <div className="filter-chips">
+              <span className="filter-label" id="filter-operators-label">OPERATORS</span>
+              <div className="filter-chips" role="group" aria-labelledby="filter-operators-label">
                 <button
                   className={`chip${filterScope === 'full' ? ' active' : ''}`}
+                  aria-pressed={filterScope === 'full'}
                   onClick={activateFullDossier}
                 >
                   Full Dossier
@@ -462,6 +473,7 @@ export default function OperationLog() {
                   <button
                     className={`chip operator-chip${filterScope === 'full' ? '' : currentOps.has(name) ? ' active' : ' inactive'}`}
                     key={name}
+                    aria-pressed={filterScope === 'full' || currentOps.has(name)}
                     onClick={() => toggleOperator(name)}
                   >
                     {name}
@@ -475,8 +487,8 @@ export default function OperationLog() {
         {/* ── MATCH LIST ── */}
         <div className="match-list intel-reveal reveal-d5">
           <div className="match-list-head">
-            <div className="match-list-title">Deployment History</div>
-            <div className="match-list-count">
+            <h2 className="match-list-title">Deployment History</h2>
+            <div className="match-list-count" role="status">
               SHOWING {filtered.length} OF {(operations ?? []).length}
             </div>
           </div>
@@ -517,14 +529,15 @@ export default function OperationLog() {
                       <span className="match-duration">{formatDuration(op.game_duration)}</span>
                       <span className="match-time">{formatTime(op.game_end_timestamp)}</span>
                     </div>
+                    <div className="table-scroll">
                     <table className="match-ops">
                       <thead>
                         <tr>
-                          <th>Operator</th>
-                          <th>Champion</th>
-                          <th>KDA</th>
-                          <th className="col-num">Damage</th>
-                          <th className="col-num">Gold</th>
+                          <th scope="col">Operator</th>
+                          <th scope="col">Champion</th>
+                          <th scope="col">KDA</th>
+                          <th scope="col" className="col-num">Damage</th>
+                          <th scope="col" className="col-num">Gold</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -547,6 +560,7 @@ export default function OperationLog() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 ))}
               </div>

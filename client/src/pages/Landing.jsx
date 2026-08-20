@@ -2,7 +2,12 @@ import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
 
 function R({ w, h = 8 }) {
-  return <span className="redacted-inline" style={{ height: h, width: w, verticalAlign: 'middle' }} />
+  return (
+    <>
+      <span className="redacted-inline" aria-hidden="true" style={{ height: h, width: w, verticalAlign: 'middle' }} />
+      <span className="sr-only">[redacted]</span>
+    </>
+  )
 }
 
 export default function Landing() {
@@ -72,17 +77,17 @@ export default function Landing() {
             <div className="feature-number">
               REPORT-01 &middot; BRIEFING &middot; <R w={36} />
             </div>
-            <div className="feature-title">Cell intelligence summary</div>
+            <h3 className="feature-title">Cell intelligence summary</h3>
             <p className="feature-desc">
               Joint WR vs. the counterfactual baseline. Operator roster with
               per-subject subtraction analysis. Champion pools. Pair-level
-              link analysis. Tilt index and post-loss cohesion decay. Behavioral
-              observations filed by mode and time of day.
+              link analysis. Campaign record of the season&rsquo;s trend.
+              Behavioral observations filed by mode and time of day.
             </p>
           </div>
           <div className="feature">
             <div className="feature-number">REPORT-02 &middot; OPERATION LOG</div>
-            <div className="feature-title">Joint deployments, indexed</div>
+            <h3 className="feature-title">Joint deployments, indexed</h3>
             <p className="feature-desc">
               Match history scoped to engagements with two or more operators on
               the same team. Per-match KDA, champion, and damage tabulated by

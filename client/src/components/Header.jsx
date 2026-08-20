@@ -126,6 +126,8 @@ export default function Header() {
             className="cell-switcher-trigger"
             type="button"
             tabIndex={user ? 0 : -1}
+            aria-haspopup="true"
+            aria-expanded={dropdownOpen}
             onClick={() => user && setDropdownOpen(!dropdownOpen)}
           >
             {user && activeCell ? (
@@ -171,17 +173,24 @@ export default function Header() {
                         </div>
                         <div className="cs-cell-meta">
                           {cell.member_count} OPERATOR{cell.member_count !== 1 ? 'S' : ''}
-                          {isHandler && (
-                            <span
-                              className="cs-manage-btn"
-                              title="Manage operators"
-                              onClick={(e) => handleManageToggle(e, cell)}
-                            >
-                              {isManaging ? '▴' : '▾'}
-                            </span>
-                          )}
                         </div>
                       </button>
+
+                      {/* Sibling of the row button (a button cannot nest in a
+                          button); CSS overlays it on the meta line. Real button
+                          = keyboard-reachable manage panel. */}
+                      {isHandler && (
+                        <button
+                          type="button"
+                          className="cs-manage-btn"
+                          title="Manage operators"
+                          aria-expanded={isManaging}
+                          aria-label={`Manage operators in ${cell.name}`}
+                          onClick={(e) => handleManageToggle(e, cell)}
+                        >
+                          {isManaging ? '▴' : '▾'}
+                        </button>
+                      )}
 
                       {/* Handler management panel */}
                       {isHandler && isManaging && (

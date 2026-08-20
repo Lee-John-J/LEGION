@@ -20,7 +20,7 @@ export default function CellOverlay() {
           <div className="form-card-banner">
             CONFIDENTIAL // RECORDS RETRIEVAL // TEMPORARY FAULT
           </div>
-          <h1 className="form-title">Records Unavailable</h1>
+          <h2 className="form-title">Records Unavailable</h2>
           <p className="form-subtitle">
             Case file retrieval failed. This is a transmission fault, not a
             missing file — your records remain intact. Re-attempt retrieval.
@@ -45,7 +45,7 @@ export default function CellOverlay() {
           <div className="form-card-banner">
             CONFIDENTIAL // CELL DESIGNATION // HANDLE WITH CARE
           </div>
-          <h1 className="form-title">No Active Case File</h1>
+          <h2 className="form-title">No Active Case File</h2>
           <p className="form-subtitle">
             Intelligence briefings require a designated cell. Open a new case
             file or join an existing cell via invite code to begin surveillance.
@@ -94,7 +94,7 @@ export default function CellOverlay() {
           <div className="form-card-banner">
             CONFIDENTIAL // CELL INTAKE // PENDING OPERATORS
           </div>
-          <h1 className="form-title">Append Operators to Cell</h1>
+          <h2 className="form-title">Append Operators to Cell</h2>
           <p className="form-subtitle">
             Cell <strong>{activeCell.name}</strong> is active with one operator
             on file. Distribute the intake code below to open files on

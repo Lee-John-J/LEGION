@@ -2,7 +2,12 @@ import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
 
 function R({ w, h = 8 }) {
-  return <span className="redacted-inline" style={{ height: h, width: w, verticalAlign: 'middle' }} />
+  return (
+    <>
+      <span className="redacted-inline" aria-hidden="true" style={{ height: h, width: w, verticalAlign: 'middle' }} />
+      <span className="sr-only">[redacted]</span>
+    </>
+  )
 }
 
 export default function About() {
@@ -158,9 +163,9 @@ export default function About() {
             <div className="term-def">A match in which two or more cell operators were on the same team.</div>
           </div>
           <div className="term-row">
-            <div className="term-label">TILT INDEX</div>
+            <div className="term-label">CAMPAIGN RECORD</div>
             <div className="term-arrow">&rarr;</div>
-            <div className="term-def">Composite metric tracking post-loss cohesion decay across consecutive-loss sequences.</div>
+            <div className="term-def">Season trend of the rolling 20-game joint win rate, plotted one step per deployment.</div>
           </div>
           <div className="term-row">
             <div className="term-label">ZOO</div>

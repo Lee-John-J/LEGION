@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import Header from './components/Header'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -9,26 +10,47 @@ import Intake from './pages/Intake'
 import Briefing from './pages/Briefing'
 import OperationLog from './pages/OperationLog'
 
+// Per-route document titles so tabs and screen readers can tell pages apart
+const TITLES = {
+  '/': 'LEGION',
+  '/about': 'ABOUT // LEGION',
+  '/authenticate': 'AUTHENTICATE // LEGION',
+  '/intake': 'INTAKE // LEGION',
+  '/briefing': 'BRIEFING // LEGION',
+  '/oplog': 'OPERATION LOG // LEGION',
+}
+
+function TitleSync() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    document.title = TITLES[pathname] ?? 'LEGION'
+  }, [pathname])
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <TitleSync />
         <Header />
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/authenticate" element={<Authenticate />} />
-          <Route path="/intake" element={
-            <ProtectedRoute><Intake /></ProtectedRoute>
-          } />
-          <Route path="/briefing" element={
-            <ProtectedRoute><Briefing /></ProtectedRoute>
-          } />
-          <Route path="/oplog" element={
-            <ProtectedRoute><OperationLog /></ProtectedRoute>
-          } />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <main>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/authenticate" element={<Authenticate />} />
+            <Route path="/intake" element={
+              <ProtectedRoute><Intake /></ProtectedRoute>
+            } />
+            <Route path="/briefing" element={
+              <ProtectedRoute><Briefing /></ProtectedRoute>
+            } />
+            <Route path="/oplog" element={
+              <ProtectedRoute><OperationLog /></ProtectedRoute>
+            } />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
       </AuthProvider>
     </BrowserRouter>
   )
