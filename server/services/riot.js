@@ -7,18 +7,22 @@
  *  3. Automatic retry on 429 (rate limited)
  *
  * The rate limiter uses a simple queue: every request goes through
- * waitForSlot() before hitting the network. This prevents bursting
- * past Riot's limits even when fetching dozens of matches at once.
+ * waitForSlot() before hitting the network, so one sync cannot burst past
+ * Riot's limits. Limiter and cache are in-memory and therefore PER WARM
+ * SERVERLESS INSTANCE on Vercel: they bound a single instance's bursts,
+ * they are not a global guarantee across concurrent instances.
  */
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY
 const RIOT_REGION = process.env.RIOT_REGION || 'americas'
-const LOL_REGION = process.env.LOL_REGION || 'na1'
+// A hung upstream connection must not consume the 60 s serverless budget
+const RIOT_REQUEST_TIMEOUT_MS = 8000
 
 // ── In-memory cache (5-min TTL) ──────────────────────────────────
 
 const cache = new Map()
 const CACHE_TTL = 5 * 60 * 1000
+const CACHE_MAX_ENTRIES = 500
 
 function getCached(url) {
   if (!cache.has(url)) return null
@@ -31,6 +35,9 @@ function getCached(url) {
 }
 
 function setCache(url, data) {
+  // Entries only expire on read, so without a cap a warm instance would
+  // hold every URL it has ever fetched.
+  if (cache.size >= CACHE_MAX_ENTRIES) cache.clear()
   cache.set(url, { data, ts: Date.now() })
 }
 
@@ -92,28 +99,33 @@ async function drainQueue() {
 
 // ── Core fetch with caching + rate limiting ──────────────────────
 
-async function riotFetch(url, retries = 2) {
-  // Check cache first
-  const cached = getCached(url)
-  if (cached) return cached
+// cacheable: false for payloads that are persisted elsewhere (match details
+// go straight to the DB and are never requested twice), so they don't fill
+// the cache for zero hits.
+async function riotFetch(url, { retries = 2, cacheable = true } = {}) {
+  if (cacheable) {
+    const cached = getCached(url)
+    if (cached) return cached
+  }
 
   // Wait for rate limit slot
   await waitForSlot()
 
   const res = await fetch(url, {
     headers: { 'X-Riot-Token': RIOT_API_KEY },
+    signal: AbortSignal.timeout(RIOT_REQUEST_TIMEOUT_MS),
   })
 
   if (res.status === 429) {
+    if (retries <= 0) throw new Error('RATE_LIMITED')
     // Retry-After may be an HTTP date (parseInt -> NaN, which would retry
     // instantly), and honoring a long wait would blow the 60s serverless
     // budget — default NaN to 2s and cap the sleep at 10s.
     const parsed = parseInt(res.headers.get('Retry-After') || '2', 10)
     const retryAfter = Math.min(Number.isFinite(parsed) ? parsed : 2, 10)
     console.warn(`[RIOT] Rate limited — retrying in ${retryAfter}s`)
-    if (retries <= 0) throw new Error('RATE_LIMITED')
     await new Promise((r) => setTimeout(r, retryAfter * 1000))
-    return riotFetch(url, retries - 1)
+    return riotFetch(url, { retries: retries - 1, cacheable })
   }
 
   if (res.status === 404) {
@@ -131,7 +143,7 @@ async function riotFetch(url, retries = 2) {
   }
 
   const data = await res.json()
-  setCache(url, data)
+  if (cacheable) setCache(url, data)
   return data
 }
 
@@ -139,11 +151,6 @@ async function riotFetch(url, retries = 2) {
 
 async function getAccountByRiotId(gameName, tagLine) {
   const url = `https://${RIOT_REGION}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`
-  return riotFetch(url)
-}
-
-async function getMatchIds(puuid, count = 20) {
-  const url = `https://${RIOT_REGION}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?count=${count}`
   return riotFetch(url)
 }
 
@@ -170,7 +177,7 @@ async function getMatchIdsPaginated(puuid, { maxMatches = 500, startTime } = {})
 
 async function getMatch(matchId) {
   const url = `https://${RIOT_REGION}.api.riotgames.com/lol/match/v5/matches/${matchId}`
-  return riotFetch(url)
+  return riotFetch(url, { cacheable: false })
 }
 
-module.exports = { getAccountByRiotId, getMatchIds, getMatchIdsPaginated, getMatch }
+module.exports = { getAccountByRiotId, getMatchIdsPaginated, getMatch }

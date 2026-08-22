@@ -2,19 +2,32 @@ const express = require('express')
 const crypto = require('crypto')
 const router = express.Router()
 const { supabase } = require('../db/supabase')
+const { requireAuth } = require('../middleware/auth')
 const { getAccountByRiotId, getMatchIdsPaginated, getMatch } = require('../services/riot')
-const { computeCellStats, isRemake } = require('../services/stats')
+const { computeCellStats, isRemake, getSameTeamCellGroup } = require('../services/stats')
+const { currentSeasonStart, currentSeasonStartEpoch, currentSeasonYear } = require('../services/season')
 
-// ── Auth middleware ──────────────────────────────────────────────
+// ── Limits (named once so the numbers are explained once) ────────
+const CELL_CAPACITY = 10               // operators per cell (see CLAUDE.md)
+const MAX_MATCH_IDS_PER_OPERATOR = 500 // Riot match-id pages walked per operator per sync
+const INGEST_BATCH_LIMIT = 40          // match payloads fetched per sync (one Riot call each)
+const INGEST_TIME_BUDGET_MS = 45_000   // stop early; Vercel kills the function at 60 s
+const EXISTENCE_CHUNK = 500            // ids per "already stored?" query (PostgREST caps rows at 1000)
 
-async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'AUTHENTICATION REQUIRED' })
+// ── Helper: reject malformed UUID path params up front ───────────
+// A garbage id would otherwise cost a DB round trip and come back as a
+// misleading 403/404 instead of a 400.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return res.status(401).json({ error: 'CLEARANCE DENIED' })
-  req.user = user
-  next()
+function requireUuidParams(...names) {
+  return (req, res, next) => {
+    for (const name of names) {
+      if (!UUID_RE.test(req.params[name] ?? '')) {
+        return res.status(400).json({ error: 'MALFORMED IDENTIFIER' })
+      }
+    }
+    next()
+  }
 }
 
 // ── Helper: generate LGN-XXXX-XXXX invite code ─────────────────
@@ -52,30 +65,37 @@ function allowJoinAttempt(userId) {
 
 // ── Helper: verify user is a member of the cell ─────────────────
 async function requireCellMembership(sb, cellId, userId) {
-  const { data } = await sb
+  const { data, error } = await sb
     .from('cell_members')
     .select('id')
     .eq('cell_id', cellId)
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
+  // A DB fault must not read as "not a member": throw so the error
+  // middleware answers 500 instead of denying a legitimate operator.
+  if (error) throw new Error(`[LEGION] Membership check failed: ${error.message}`)
   return !!data
 }
 
 // ── Helper: get cell member PUUIDs ───────────────────────────────
 
 async function getCellPuuids(sb, cellId) {
-  const { data: memberRows } = await sb
+  const { data: memberRows, error: memberError } = await sb
     .from('cell_members')
     .select('user_id')
     .eq('cell_id', cellId)
+  // Propagate DB faults: an empty roster here would otherwise render as a
+  // 200 "no linked operators" Briefing for the duration of an outage.
+  if (memberError) throw new Error(`[LEGION] Roster query failed: ${memberError.message}`)
 
   const userIds = (memberRows ?? []).map((r) => r.user_id)
   if (userIds.length === 0) return []
 
-  const { data: opRows } = await sb
+  const { data: opRows, error: opError } = await sb
     .from('operators')
     .select('user_id, puuid, riot_game_name, riot_tag_line')
     .in('user_id', userIds)
+  if (opError) throw new Error(`[LEGION] Operator query failed: ${opError.message}`)
 
   const members = (opRows ?? [])
     .map((r) => ({ id: r.user_id, puuid: r.puuid, riot_game_name: r.riot_game_name, riot_tag_line: r.riot_tag_line }))
@@ -84,41 +104,34 @@ async function getCellPuuids(sb, cellId) {
   return members
 }
 
-// ── Season boundary (LoL seasons start mid-January each year) ────
-
-function currentSeasonStart() {
-  const now = new Date()
-  return new Date(Date.UTC(now.getUTCFullYear(), 0, 10))
-}
-
-function currentSeasonStartEpoch() {
-  return Math.floor(currentSeasonStart().getTime() / 1000)
-}
-
 // ── Helper: fetch matches from DB that overlap with any of these PUUIDs ──
 // Filters to the current season via the match's gameStartTimestamp (epoch
-// millis inside the raw JSONB), and pages past PostgREST's silent 1000-row
-// response cap so long histories don't quietly lose their oldest games.
+// millis inside the raw JSONB) and walks past PostgREST's silent 1000-row
+// response cap with a KEYSET cursor on match_id. Offset paging ordered by a
+// non-unique column could repeat or skip rows whenever an ingest landed
+// between two pages — double-counting games in every stat.
 
 async function getStoredMatches(sb, puuids) {
   const seasonStartMs = currentSeasonStart().getTime()
   const PAGE = 1000
   const rows = []
-  for (let from = 0; ; from += PAGE) {
+  let after = '' // every match_id sorts after the empty string
+  for (;;) {
     const { data, error } = await sb
       .from('matches')
       .select('match_id, match_data')
       .overlaps('participants_puuids', puuids)
       .gte('match_data->info->gameStartTimestamp', seasonStartMs)
-      .order('fetched_at', { ascending: false })
-      .range(from, from + PAGE - 1)
+      .gt('match_id', after)
+      .order('match_id', { ascending: true })
+      .limit(PAGE)
 
-    if (error) {
-      console.error('[LEGION] Match query error:', error.message)
-      break
-    }
+    // Surface the fault rather than computing a season on a truncated set
+    // and returning it as a 200.
+    if (error) throw new Error(`[LEGION] Match query failed: ${error.message}`)
     rows.push(...(data ?? []))
     if (!data || data.length < PAGE) break
+    after = data[data.length - 1].match_id
   }
   return rows
 }
@@ -181,7 +194,7 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /api/cells — create a new cell
 router.post('/', requireAuth, async (req, res) => {
   const sb = supabase
-  const name = typeof req.body.name === 'string' ? req.body.name.trim() : ''
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
   if (!name) return res.status(400).json({ error: 'CELL DESIGNATION REQUIRED' })
   if (name.length > 64) {
     return res.status(400).json({ error: 'CELL DESIGNATION EXCEEDS 64 CHARACTERS' })
@@ -217,7 +230,7 @@ router.post('/', requireAuth, async (req, res) => {
 })
 
 // GET /api/cells/:id — get cell with members
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
     return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
@@ -252,7 +265,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 // POST /api/cells/join-by-code — look up cell by invite code and join
 // Service role client bypasses RLS, so we query tables directly.
 router.post('/join-by-code', requireAuth, async (req, res) => {
-  const { invite_code } = req.body
+  const { invite_code } = req.body ?? {}
   if (!invite_code) return res.status(400).json({ error: 'INVITE CODE REQUIRED' })
 
   // Invite codes are bearer credentials — cap guess attempts per user.
@@ -292,13 +305,13 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'OPERATOR ALREADY ENLISTED IN CELL' })
   }
 
-  // Check capacity (10 operators max)
+  // Check capacity
   const { count } = await sb
     .from('cell_members')
     .select('*', { count: 'exact', head: true })
     .eq('cell_id', cell.id)
 
-  if (count >= 10) {
+  if (count >= CELL_CAPACITY) {
     return res.status(400).json({ error: 'CELL AT MAXIMUM CAPACITY' })
   }
 
@@ -320,7 +333,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
 // unauthorized users from joining cells by guessing UUIDs.
 
 // DELETE /api/cells/:id/members/:userId — remove an operator (handler only)
-router.delete('/:id/members/:userId', requireAuth, async (req, res) => {
+router.delete('/:id/members/:userId', requireAuth, requireUuidParams('id', 'userId'), async (req, res) => {
   const sb = supabase
   const { data: cell, error: lookupError } = await sb
     .from('cells')
@@ -365,7 +378,7 @@ router.delete('/:id/members/:userId', requireAuth, async (req, res) => {
 })
 
 // DELETE /api/cells/:id — dissolve a cell (handler only)
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   const { data: cell, error: lookupError } = await sb
     .from('cells')
@@ -403,8 +416,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
 //   5. Returns a summary of what was fetched
 // ═════════════════════════════════════════════════════════════════
 
-router.post('/:id/ingest', requireAuth, async (req, res) => {
+router.post('/:id/ingest', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
+  const started = Date.now()
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
     return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
   }
@@ -432,13 +446,16 @@ router.post('/:id/ingest', requireAuth, async (req, res) => {
         if (!name || !tag) continue
 
         const account = await getAccountByRiotId(name, tag)
-        await sb.from('operators').upsert({
+        const { error: linkError } = await sb.from('operators').upsert({
           user_id: userId,
           puuid: account.puuid,
           riot_game_name: account.gameName,
           riot_tag_line: account.tagLine,
           is_verified: true,
         }, { onConflict: 'user_id' })
+        // The puuid unique constraint rejects a Riot ID already claimed by
+        // another operator — the same case /link answers with a 409.
+        if (linkError) throw new Error(linkError.message)
         console.log(`[LEGION] Auto-linked unlinked operator: ${name}#${tag}`)
       } catch (err) {
         console.warn(`[LEGION] Failed to auto-link operator ${userId}: ${err.message}`)
@@ -462,7 +479,7 @@ router.post('/:id/ingest', requireAuth, async (req, res) => {
   const allMatchIds = new Set()
   for (const puuid of puuids) {
     try {
-      const ids = await getMatchIdsPaginated(puuid, { maxMatches: 500, startTime: seasonStart })
+      const ids = await getMatchIdsPaginated(puuid, { maxMatches: MAX_MATCH_IDS_PER_OPERATOR, startTime: seasonStart })
       ids.forEach((id) => allMatchIds.add(id))
     } catch (err) {
       console.warn(`[LEGION] Failed to get match IDs for ${puuid}: ${err.message}`)
@@ -473,22 +490,33 @@ router.post('/:id/ingest', requireAuth, async (req, res) => {
     return res.json({ status: 'NO_MATCHES_FOUND', fetched: 0, skipped: 0 })
   }
 
-  const { data: existingRows } = await sb
-    .from('matches')
-    .select('match_id')
-    .in('match_id', Array.from(allMatchIds))
+  // "Already stored?" in chunks: one .in() with thousands of ids would be
+  // silently capped at PostgREST's 1000-row limit (and could overflow the
+  // URL), making every id past the cap look new on every sync — burning
+  // Riot quota on re-fetches and never reaching "INGEST COMPLETE".
+  const idList = Array.from(allMatchIds)
+  const existingIds = new Set()
+  for (let i = 0; i < idList.length; i += EXISTENCE_CHUNK) {
+    const { data: existingRows, error } = await sb
+      .from('matches')
+      .select('match_id')
+      .in('match_id', idList.slice(i, i + EXISTENCE_CHUNK))
+    if (error) throw new Error(`[LEGION] Match existence query failed: ${error.message}`)
+    for (const r of existingRows ?? []) existingIds.add(r.match_id)
+  }
+  const newMatchIds = idList.filter((id) => !existingIds.has(id))
 
-  const existingIds = new Set((existingRows ?? []).map((r) => r.match_id))
-  const newMatchIds = Array.from(allMatchIds).filter((id) => !existingIds.has(id))
-
-  // Fetch details in batches that fit within Vercel's timeout.
-  // Each match detail = 1 Riot API call. Cap per sync to stay safe.
-  const BATCH_LIMIT = 40
-  const batch = newMatchIds.slice(0, BATCH_LIMIT)
-  const remaining = newMatchIds.length - batch.length
+  // Fetch details in batches that fit within Vercel's timeout — each match
+  // detail is one Riot API call — and stop early when the time budget runs
+  // out, so the caller always gets a summary instead of a platform 504.
+  const batch = newMatchIds.slice(0, INGEST_BATCH_LIMIT)
 
   let fetched = 0
   for (const matchId of batch) {
+    if (Date.now() - started > INGEST_TIME_BUDGET_MS) {
+      console.warn('[LEGION] Ingest time budget reached — deferring the rest to the next sync')
+      break
+    }
     try {
       const matchData = await getMatch(matchId)
       const participantPuuids = matchData.metadata?.participants ?? []
@@ -507,6 +535,10 @@ router.post('/:id/ingest', requireAuth, async (req, res) => {
       console.warn(`[LEGION] Failed to fetch match ${matchId}: ${err.message}`)
     }
   }
+
+  // Everything not yet on file — deferred, failed, or beyond this batch —
+  // is "pending"; the client prompts for another sync while it is > 0.
+  const remaining = newMatchIds.length - fetched
 
   res.json({
     status: remaining > 0 ? 'INGEST_PARTIAL' : 'INGEST_COMPLETE',
@@ -528,7 +560,7 @@ router.post('/:id/ingest', requireAuth, async (req, res) => {
 // Run /ingest first to populate the cache.
 // ═════════════════════════════════════════════════════════════════
 
-router.get('/:id/stats', requireAuth, async (req, res) => {
+router.get('/:id/stats', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
     return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
@@ -572,34 +604,12 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
   const matchRows = await getStoredMatches(sb, puuids)
   const matches = matchRows.map((r) => r.match_data)
   const stats = computeCellStats(matches, puuids, fullRoster)
-  stats.season_year = new Date().getUTCFullYear()
+  stats.season_year = currentSeasonYear()
 
-  const userIds = members.map((m) => m.id)
-  const { data: otherMemberships } = await sb
-    .from('cell_members')
-    .select('cell_id, user_id, cells(id, name)')
-    .in('user_id', userIds)
-    .neq('cell_id', req.params.id)
-
-  const adjacencyMap = new Map()
-  for (const row of (otherMemberships ?? [])) {
-    const cid = row.cell_id
-    if (!adjacencyMap.has(cid)) {
-      adjacencyMap.set(cid, { cell_id: cid, cell_name: row.cells?.name ?? 'UNKNOWN', shared_user_ids: [] })
-    }
-    adjacencyMap.get(cid).shared_user_ids.push(row.user_id)
-  }
-
-  const adjacent_cells = Array.from(adjacencyMap.values())
-    .filter((a) => a.shared_user_ids.length >= 3)
-    .map((a) => ({
-      cell_id: a.cell_id,
-      cell_name: a.cell_name,
-      shared_count: a.shared_user_ids.length,
-      shared_operators: members.filter((m) => a.shared_user_ids.includes(m.id)).map((m) => m.riot_game_name ?? 'UNKNOWN'),
-    }))
-
-  res.json({ ...stats, adjacent_cells })
+  // Deliberately NO cross-cell data here: an earlier "adjacent cells" block
+  // returned other cells' ids, names, and rosters to people who were not
+  // members of them, and nothing in the UI ever rendered it.
+  res.json(stats)
 })
 
 // ═════════════════════════════════════════════════════════════════
@@ -609,7 +619,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
 // formatted for the Operation Log page.
 // ═════════════════════════════════════════════════════════════════
 
-router.get('/:id/operations', requireAuth, async (req, res) => {
+router.get('/:id/operations', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
     return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
@@ -630,27 +640,11 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
     // agrees with the Briefing's stats engine, which also excludes them.
     if (isRemake(match)) continue
     const participants = match.info?.participants ?? []
-    const allCellInMatch = participants.filter((p) => puuidSet.has(p.puuid))
-
-    // Group cell members by teamId — only count as joint if 2+ on SAME team.
-    // Arena (CHERRY) games have 8 subteams of 2; teamId lumps 4 subteams
-    // together, so group by playerSubteamId there instead.
-    if (allCellInMatch.length < 2) continue
-    const isArena = match.info?.gameMode === 'CHERRY' || match.info?.queueId === 1700
-    const byTeam = {}
-    for (const p of allCellInMatch) {
-      const tid = isArena ? p.playerSubteamId : p.teamId
-      if (!byTeam[tid]) byTeam[tid] = []
-      byTeam[tid].push(p)
-    }
-    // Find the team with the most cell members (must be >= 2)
-    let cellParticipants = null
-    for (const team of Object.values(byTeam)) {
-      if (team.length >= 2 && (!cellParticipants || team.length > cellParticipants.length)) {
-        cellParticipants = team
-      }
-    }
+    // Same joint-deployment rule as the stats engine (same team, or the same
+    // Arena subteam), so the log and the Briefing can never disagree.
+    const cellParticipants = getSameTeamCellGroup(participants, puuidSet)
     if (!cellParticipants) continue
+    const isArena = participants.some((p) => (p.playerSubteamId ?? 0) > 0)
 
     operations.push({
       match_id: row.match_id,
@@ -665,18 +659,24 @@ router.get('/:id/operations', requireAuth, async (req, res) => {
       cell_members_won: cellParticipants[0].win,
       // Arena final standing (1-8) — placement is per-subteam, so any member's value works
       placement: isArena ? (cellParticipants[0].placement ?? cellParticipants[0].subteamPlacement ?? null) : null,
-      participants: cellParticipants.map((p) => ({
-        name: members.find((m) => m.puuid === p.puuid)?.riot_game_name ?? p.riotIdGameName,
-        champion: p.championName,
-        kills: p.kills,
-        deaths: p.deaths,
-        assists: p.assists,
-        damage: p.totalDamageDealtToChampions,
-        gold: p.goldEarned,
-        win: p.win,
-        // Assigned lane (TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY) — empty for ARAM/Arena
-        role: p.teamPosition || null,
-      })),
+      participants: cellParticipants.map((p) => {
+        const member = members.find((m) => m.puuid === p.puuid)
+        return {
+          // user_id lets the client mark the viewer by identity rather than
+          // by display name (Riot names change; ids never do)
+          user_id: member?.id ?? null,
+          name: member?.riot_game_name ?? p.riotIdGameName,
+          champion: p.championName,
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          damage: p.totalDamageDealtToChampions,
+          gold: p.goldEarned,
+          win: p.win,
+          // Assigned lane (TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY) — empty for ARAM/Arena
+          role: p.teamPosition || null,
+        }
+      }),
     })
   }
 

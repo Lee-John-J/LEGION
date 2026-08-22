@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 
-export default function ConfirmModal({ label, title, description, confirmText, onConfirm, onCancel }) {
+export default function ConfirmModal({ label, title, description, confirmText, error, busy, onConfirm, onCancel }) {
   const [typed, setTyped] = useState('')
   const inputRef = useRef(null)
   const modalRef = useRef(null)
@@ -69,16 +69,19 @@ export default function ConfirmModal({ label, title, description, confirmText, o
             type="text"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && match) onConfirm() }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && match && !busy) onConfirm() }}
             placeholder={confirmText}
             spellCheck={false}
             autoComplete="off"
           />
+          {error && (
+            <div className="confirm-error" role="alert">{error}</div>
+          )}
         </div>
         <div className="confirm-actions">
           <button className="confirm-cancel" onClick={onCancel}>CANCEL</button>
-          <button className="confirm-execute" disabled={!match} onClick={onConfirm}>
-            CONFIRM
+          <button className="confirm-execute" disabled={!match || busy} onClick={onConfirm}>
+            {busy ? 'EXECUTING...' : 'CONFIRM'}
           </button>
         </div>
       </div>

@@ -3,10 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import Footer from '../components/Footer'
-
-function R({ w, h = 8 }) {
-  return <span className="redacted-inline" style={{ height: h, width: w, verticalAlign: 'middle' }} />
-}
+import { Redacted as R } from '../components/Redacted'
 
 export default function Intake() {
   const navigate = useNavigate()

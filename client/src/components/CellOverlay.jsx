@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useClipboard } from '../hooks/useClipboard'
 
 export default function CellOverlay() {
   const navigate = useNavigate()
   const { activeCell, cellsLoading, cellsError, refreshCells } = useAuth()
   const [dismissed, setDismissed] = useState(false)
+  const { copied, copy } = useClipboard()
 
   // Wait until cells have actually been fetched before deciding
   if (cellsLoading) return null
@@ -107,9 +109,9 @@ export default function CellOverlay() {
             <code className="invite-overlay-code">{activeCell.invite_code}</code>
             <button
               className="invite-copy-btn invite-copy-btn-dark"
-              onClick={() => navigator.clipboard.writeText(activeCell.invite_code)}
+              onClick={() => copy(activeCell.invite_code)}
             >
-              COPY CODE
+              {copied ? 'COPIED' : 'COPY CODE'}
             </button>
           </div>
 

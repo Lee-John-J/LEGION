@@ -320,7 +320,7 @@
     }
     .mode-row.mode-rotating .mode-name { color: var(--muted); font-style: italic; }
 
-    /* ── TWO-COL (DUO + HEATMAP) ── */
+    /* ── TWO-COL (LINK ANALYSIS + HEATMAP) ── */
     .two-col {
       display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
       gap: 16px; margin-bottom: 16px; align-items: stretch;
@@ -328,40 +328,7 @@
     .vis-panel { padding: 24px 26px; display: flex; flex-direction: column; }
     .panel-body { display: flex; flex-direction: column; flex: 1; justify-content: center; }
 
-    /* ── MATRIX ── */
-    .matrix-grid {
-      display: grid; gap: 3px; width: 100%;
-      grid-template-columns: 48px repeat(7, minmax(0, 1fr));
-      grid-template-rows: 36px repeat(7, 1fr);
-      min-height: 280px;
-    }
-    .matrix-label {
-      font-family: var(--font-mono);
-      font-size: 10px; letter-spacing: 1px; color: var(--muted);
-      display: flex; align-items: center; overflow: hidden; white-space: nowrap;
-      text-overflow: ellipsis; padding-right: 4px;
-    }
-    .matrix-label-top {
-      font-family: var(--font-mono);
-      font-size: 10px; letter-spacing: 1px; color: var(--muted); text-align: center;
-      writing-mode: vertical-rl; transform: rotate(180deg);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .matrix-cell {
-      display: flex; align-items: center; justify-content: center;
-      font-family: var(--font-stat); font-size: 12px; font-weight: 700;
-      position: relative; cursor: default; border-radius: 3px; min-height: 24px;
-    }
-    .matrix-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; z-index: 5; }
-    .matrix-cell:hover::after {
-      content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px);
-      left: 50%; transform: translateX(-50%); background: var(--surface-dark);
-      color: var(--text-inverse); font-size: 10px; padding: 6px 10px; white-space: nowrap;
-      z-index: 20; font-weight: 400; letter-spacing: 0; border-radius: 4px;
-      font-family: var(--font-mono);
-    }
-    .matrix-self { background: var(--surface); color: var(--muted); font-size: 11px; }
-    .matrix-empty { background: var(--surface); color: transparent; }
+    /* ── WR TIER TINTS (mode-wr badges) ── */
     .wr-low   { background: var(--red-bg);   color: var(--red-dark); }
     .wr-mid   { background: var(--amber-bg); color: var(--amber-dark); }
     .wr-high  { background: var(--green-bg); color: var(--green-dark); }
@@ -394,15 +361,8 @@
     .h-5 { background: var(--slate-5); }
 
     /* ══════════════════════════════════════════════════════
-       ANALYST ROW — Tilt Index (wider) + Link Analysis (vertical/narrow)
+       ANALYST CARDS — shared FUN CARD base + per-card styles
        ══════════════════════════════════════════════════════ */
-    .analyst-row {
-      display: grid;
-      grid-template-columns: 1.45fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
-      align-items: stretch;
-    }
 
     /* ── FUN CARD base ── */
     .fun-card { padding: 28px 30px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
@@ -410,65 +370,6 @@
     .fun-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 5px; }
     .fun-subtitle { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 20px; }
     .fun-body { flex: 1; }
-
-    /* ── TILT INDEX ── */
-    .tilt-measuring {
-      padding: 12px 14px; background: var(--surface);
-      border-left: 3px solid var(--amber);
-      margin-bottom: 22px;
-    }
-    .tilt-measuring-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
-    .tilt-measuring-text { font-size: 11.5px; line-height: 1.6; color: var(--muted); }
-    .tilt-class-head {
-      display: grid; grid-template-columns: 1fr auto; align-items: baseline;
-      gap: 12px; padding-bottom: 14px; border-bottom: 1px dashed var(--border);
-      margin-bottom: 16px;
-    }
-    .tilt-class-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2.5px; color: var(--muted); grid-column: 1 / -1; font-weight: 600; }
-    .tilt-class-value {
-      font-family: var(--font-display); font-size: 32px; font-weight: 700;
-      letter-spacing: 1px; color: var(--amber);
-    }
-    .tilt-class-score {
-      font-family: var(--font-stat); font-size: 22px; font-weight: 700;
-      color: var(--muted); letter-spacing: 0;
-    }
-    .tilt-segments {
-      display: grid; grid-template-columns: repeat(10, 1fr);
-      gap: 3px; margin-bottom: 22px;
-    }
-    .tilt-seg {
-      height: 20px; background: var(--surface);
-      border: 1px solid var(--border-light);
-    }
-    .tilt-seg.on-amber { background: var(--amber-mid); border-color: var(--amber); }
-    .tilt-seg.on-red   { background: var(--red-mid);   border-color: var(--red); }
-
-    .judgments-head {
-      font-family: var(--font-mono); font-size: 10px; letter-spacing: 2.5px; color: var(--muted);
-      margin-bottom: 10px; padding-bottom: 8px; font-weight: 600;
-      border-bottom: 1px dashed var(--border);
-    }
-    .judgment {
-      padding: 10px 0 10px 16px; font-size: 13px; line-height: 1.65;
-      color: var(--text); position: relative;
-      border-bottom: 1px dashed var(--border-light);
-    }
-    .judgment:last-child { border-bottom: none; }
-    .judgment::before {
-      content: '▸'; position: absolute; left: 0; top: 10px;
-      color: var(--amber); font-size: 11px;
-    }
-    .judgment strong {
-      font-family: var(--font-display); font-weight: 700;
-      letter-spacing: 0; color: var(--text);
-    }
-    .confidence-stamp {
-      display: inline-block; margin-top: 14px;
-      font-family: var(--font-mono);
-      font-size: 10px; letter-spacing: 2px; padding: 4px 10px;
-      border: 1px solid var(--amber); color: var(--amber); font-weight: 600;
-    }
 
     /* ── LINK ANALYSIS (mirrors client/src/index.css) ── */
     .link-svg-wrap {
@@ -667,7 +568,6 @@
       .cm-summary-cell:nth-child(2) { border-right: none; }
       .cm-summary-cell:nth-child(-n+2) { border-bottom: 1px solid var(--border-light); }
       .two-col, .pools-grid { grid-template-columns: 1fr; }
-      .analyst-row { grid-template-columns: 1fr; }
       .stat-value { font-size: 56px; }
       .dashboard { padding: 24px 20px 60px; }
     }

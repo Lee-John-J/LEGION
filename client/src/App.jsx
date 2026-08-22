@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import Header from './components/Header'
+import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import Landing from './pages/Landing'
 import About from './pages/About'
@@ -35,21 +36,25 @@ export default function App() {
         <TitleSync />
         <Header />
         <main>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/authenticate" element={<Authenticate />} />
-            <Route path="/intake" element={
-              <ProtectedRoute><Intake /></ProtectedRoute>
-            } />
-            <Route path="/briefing" element={
-              <ProtectedRoute><Briefing /></ProtectedRoute>
-            } />
-            <Route path="/oplog" element={
-              <ProtectedRoute><OperationLog /></ProtectedRoute>
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          {/* A page-level render fault shows a fault card instead of a blank
+              screen; the header above stays usable so the user can navigate */}
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/authenticate" element={<Authenticate />} />
+              <Route path="/intake" element={
+                <ProtectedRoute><Intake /></ProtectedRoute>
+              } />
+              <Route path="/briefing" element={
+                <ProtectedRoute><Briefing /></ProtectedRoute>
+              } />
+              <Route path="/oplog" element={
+                <ProtectedRoute><OperationLog /></ProtectedRoute>
+              } />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
       </AuthProvider>
     </BrowserRouter>

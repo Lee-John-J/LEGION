@@ -1,14 +1,6 @@
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
-
-function R({ w, h = 8 }) {
-  return (
-    <>
-      <span className="redacted-inline" aria-hidden="true" style={{ height: h, width: w, verticalAlign: 'middle' }} />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
+import { Redacted as R } from '../components/Redacted'
 
 export default function Landing() {
   return (

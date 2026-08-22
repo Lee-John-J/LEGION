@@ -43,8 +43,6 @@ export const api = {
   createCell: (data) =>
     request('/cells', { method: 'POST', body: JSON.stringify(data) }),
   getCell: (id) => request(`/cells/${id}`),
-  joinCell: (id, data) =>
-    request(`/cells/${id}/join`, { method: 'POST', body: JSON.stringify(data) }),
   joinCellByCode: (invite_code) =>
     request('/cells/join-by-code', { method: 'POST', body: JSON.stringify({ invite_code }) }),
   deleteCell: (id) =>

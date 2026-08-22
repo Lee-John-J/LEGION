@@ -1,11 +1,12 @@
 /**
- * Mock data for local dev preview. Simulates a fully populated "Zoo 2" cell
- * with five operators so pages can be viewed without authentication.
+ * Mock data for local dev preview. Simulates a fully populated "NIGHT SHIFT"
+ * cell with five operators so pages can be viewed without authentication.
  *
- * Active in dev mode only (import.meta.env.DEV) when no real session exists.
+ * Dev mode only: every consumer loads this module through a dynamic import
+ * behind the DEV_MOCK gate in ./devMock.js, so it never ships to production.
  */
 
-const MOCK_CELL_ID = 'mock-zoo-2'
+import { MOCK_CELL_ID } from './devMock'
 
 export const MOCK_USER = {
   id: 'mock-user-1',
@@ -19,7 +20,7 @@ export const MOCK_USER = {
 export const MOCK_CELLS = [
   {
     id: MOCK_CELL_ID,
-    name: 'Zoo 2',
+    name: 'NIGHT SHIFT',
     created_by: 'mock-user-1',
     member_count: 5,
     created_at: '2026-01-15T04:30:00Z',
@@ -314,18 +315,6 @@ export const MOCK_STATS = {
     { win: true, timestamp: Date.now() - 604800000, mode: 'Ranked Flex' },
   ],
 
-  // ── Tilt Index ──
-  tilt_index: {
-    score: 4.8,
-    label: 'GUARDED',
-    judgments: [
-      { label: 'Post-loss queue rate', text: '72% — cell re-queues after losses at an elevated rate' },
-      { label: 'Maximum consecutive losses', text: '4 — recorded in a single session' },
-      { label: 'WR after first loss', text: '38% — performance degrades after initial defeat' },
-      { label: 'Session length after loss', text: 'Average 2.3 additional games played after a loss' },
-      { label: 'Recovery pattern', text: 'Cell recovers baseline WR within 24 hours of tilt event' },
-    ],
-  },
 
   // ── Analyst observations ──
   assessments: [
@@ -430,7 +419,3 @@ function generateMockOperations() {
 }
 
 export const MOCK_OPERATIONS = generateMockOperations()
-
-export function isMockCell(cellId) {
-  return cellId === MOCK_CELL_ID
-}

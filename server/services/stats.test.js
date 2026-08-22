@@ -11,35 +11,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { computeCellStats, isRemake, getSameTeamCellGroup } = require('./stats')
-
-// ── Builders ─────────────────────────────────────────────────────
-
-function participant(puuid, overrides = {}) {
-  return {
-    puuid,
-    teamId: 100,
-    playerSubteamId: 0,
-    win: true,
-    championName: 'Ashe',
-    riotIdGameName: puuid,
-    kills: 1, deaths: 1, assists: 1,
-    gameEndedInEarlySurrender: false,
-    ...overrides,
-  }
-}
-
-function match({ participants, gameDuration = 1800, gameMode = 'CLASSIC', queueId = 420, endTs = 1_755_000_000_000 }) {
-  return {
-    info: {
-      participants,
-      gameDuration,
-      gameMode,
-      queueId,
-      gameEndTimestamp: endTs,
-      gameStartTimestamp: endTs - gameDuration * 1000,
-    },
-  }
-}
+const { participant, match } = require('./test-helpers')
 
 // ── getSameTeamCellGroup ─────────────────────────────────────────
 

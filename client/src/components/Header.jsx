@@ -14,6 +14,11 @@ export default function Header() {
   const [managingCellId, setManagingCellId] = useState(null)
   const [managedMembers, setManagedMembers] = useState([])
   const [managingLoading, setManagingLoading] = useState(false)
+  // Handler actions (dissolve / remove) report failures inside the confirm
+  // dialog — a browser alert() breaks the dossier chrome and is invisible
+  // to the focus trap. actionBusy blocks double-submits while a call is out.
+  const [actionError, setActionError] = useState(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const dropdownRef = useRef(null)
 
   const isAuthPage = location.pathname === '/authenticate'
@@ -52,8 +57,13 @@ export default function Header() {
     navigate('/briefing')
   }
 
+  const describeFailure = (err) =>
+    err.status === 401 ? 'CLEARANCE EXPIRED. RE-AUTHENTICATE AND RETRY.' : (err.message || 'REQUEST FAILED')
+
   const handleDissolve = useCallback(async () => {
-    if (!dissolveTarget) return
+    if (!dissolveTarget || actionBusy) return
+    setActionBusy(true)
+    setActionError(null)
     try {
       await api.deleteCell(dissolveTarget.id)
       await refreshCells()
@@ -62,9 +72,11 @@ export default function Header() {
       setDropdownOpen(false)
       navigate('/briefing')
     } catch (err) {
-      alert(err.message)
+      setActionError(describeFailure(err))
+    } finally {
+      setActionBusy(false)
     }
-  }, [dissolveTarget, refreshCells, navigate])
+  }, [dissolveTarget, actionBusy, refreshCells, navigate])
 
   // Token so a slow roster response for cell A can't populate cell B's
   // manage panel when the handler flips between cells quickly.
@@ -91,18 +103,28 @@ export default function Header() {
   }
 
   const handleRemoveOperator = useCallback(async () => {
-    if (!removeTarget) return
+    if (!removeTarget || actionBusy) return
+    setActionBusy(true)
+    setActionError(null)
     try {
       await api.removeOperator(removeTarget.cellId, removeTarget.userId)
-      setRemoveTarget(null)
-      // Refresh member list
+      // Refresh the roster BEFORE closing the dialog (a refresh failure is
+      // then still reported inside it), and only into the panel that is
+      // still open — the manageSeq token keeps a stale response out of
+      // another cell's panel.
+      const seq = ++manageSeq.current
       const data = await api.getCell(removeTarget.cellId)
-      setManagedMembers(data.members || [])
+      if (seq === manageSeq.current && managingCellId === removeTarget.cellId) {
+        setManagedMembers(data.members || [])
+      }
       await refreshCells()
+      setRemoveTarget(null)
     } catch (err) {
-      alert(err.message)
+      setActionError(describeFailure(err))
+    } finally {
+      setActionBusy(false)
     }
-  }, [removeTarget, refreshCells])
+  }, [removeTarget, actionBusy, managingCellId, refreshCells])
 
   const riotName = user?.user_metadata?.riot_game_name
   const riotTag = user?.user_metadata?.riot_tag_line
@@ -212,11 +234,14 @@ export default function Header() {
                                     {!isYou && (
                                       <button
                                         className="cs-manage-remove"
-                                        onClick={() => setRemoveTarget({
-                                          cellId: cell.id,
-                                          userId: member.user_id || member.id,
-                                          name: displayName,
-                                        })}
+                                        onClick={() => {
+                                          setActionError(null)
+                                          setRemoveTarget({
+                                            cellId: cell.id,
+                                            userId: member.user_id || member.id,
+                                            name: displayName,
+                                          })
+                                        }}
                                       >
                                         REMOVE
                                       </button>
@@ -228,7 +253,7 @@ export default function Header() {
                           )}
                           <button
                             className="cs-manage-dissolve"
-                            onClick={() => setDissolveTarget(cell)}
+                            onClick={() => { setActionError(null); setDissolveTarget(cell) }}
                           >
                             DISSOLVE CELL
                           </button>
@@ -281,8 +306,10 @@ export default function Header() {
         title={`Dissolve ${dissolveTarget.name}?`}
         description="This will permanently dissolve the cell and remove all operators. All associated case data will be lost. This action cannot be undone."
         confirmText={dissolveTarget.name}
+        error={actionError}
+        busy={actionBusy}
         onConfirm={handleDissolve}
-        onCancel={() => setDissolveTarget(null)}
+        onCancel={() => { setDissolveTarget(null); setActionError(null) }}
       />
     )}
 
@@ -292,8 +319,10 @@ export default function Header() {
         title={`Remove ${removeTarget.name}?`}
         description={`This will remove ${removeTarget.name} from the cell. They will lose access to all cell intelligence and operation logs. They can rejoin later with a valid intake code.`}
         confirmText={removeTarget.name}
+        error={actionError}
+        busy={actionBusy}
         onConfirm={handleRemoveOperator}
-        onCancel={() => setRemoveTarget(null)}
+        onCancel={() => { setRemoveTarget(null); setActionError(null) }}
       />
     )}
     </>

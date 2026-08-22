@@ -1,22 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
-import { MOCK_OPERATIONS, isMockCell } from '../lib/mockData'
+import { isMockCell } from '../lib/devMock'
+import { resolveMode, isRotating } from '../lib/modes'
 import CellOverlay from '../components/CellOverlay'
 import Footer from '../components/Footer'
+import PageHeader from '../components/PageHeader'
+import FetchFault from '../components/FetchFault'
+import { Redacted } from '../components/Redacted'
 
-function R({ w, h = 12 }) {
-  return (
-    <>
-      <span
-        className="redacted-block"
-        aria-hidden="true"
-        style={{ width: w, height: h, verticalAlign: 'middle' }}
-      />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
+// Log redactions use the block variant so they size correctly in table cells
+const R = (props) => <Redacted h={12} block {...props} />
 
 function RedactedMatchRow() {
   return (
@@ -89,41 +83,6 @@ function wrAccentColor(rate) {
   return 'var(--muted)'
 }
 
-const STAPLE_MODES = ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'ARAM Mayhem', 'Arena']
-
-function resolveMode(gameMode, queueId) {
-  const queueMap = {
-    420: 'Ranked',
-    440: 'Ranked Flex',
-    400: 'Normal',
-    430: 'Normal',
-    450: 'ARAM',
-    2400: 'ARAM Mayhem',
-    900: 'URF',
-    1020: 'One for All',
-    1300: 'Nexus Blitz',
-    1700: 'Arena',
-    1900: 'URF',
-  }
-  if (queueId != null && queueMap[queueId]) return queueMap[queueId]
-
-  const modeMap = {
-    CLASSIC: 'Normal',
-    ARAM: 'ARAM',
-    CHERRY: 'Arena',
-    NEXUSBLITZ: 'Nexus Blitz',
-    URF: 'URF',
-    ARURF: 'ARURF',
-    ULTBOOK: 'Ultimate Spellbook',
-    ONEFORALL: 'One for All',
-  }
-  return modeMap[gameMode?.toUpperCase?.()] || gameMode || 'UNKNOWN'
-}
-
-function isRotating(modeName) {
-  return !STAPLE_MODES.includes(modeName)
-}
-
 // Lane order for Summoner's Rift games with assigned roles
 const ROLE_ORDER = { TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4 }
 
@@ -133,10 +92,10 @@ function formatPlacement(n) {
   return `${n}${suffix}`
 }
 
-export default function OperationLog() {
+function OperationLogView() {
   const { user, activeCell } = useAuth()
   const [operations, setOperations] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [fetchError, setFetchError] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
@@ -153,40 +112,42 @@ export default function OperationLog() {
   // overwrite the current cell's log (cell-switch race).
   const fetchSeq = useRef(0)
 
+  // No synchronous setState before the first await — see Briefing.fetchStats
   const fetchOps = useCallback(async () => {
     if (!cellId) return
     const seq = ++fetchSeq.current
-    setLoading(true)
-    setFetchError(null)
     try {
-      const data = isMockCell(cellId) ? MOCK_OPERATIONS : await api.getOperationLog(cellId)
-      if (seq === fetchSeq.current) setOperations(data)
+      let data
+      if (import.meta.env.DEV && isMockCell(cellId)) {
+        // Dev preview only — see lib/devMock.js
+        data = (await import('../lib/mockData')).MOCK_OPERATIONS
+      } else {
+        data = await api.getOperationLog(cellId)
+      }
+      if (seq === fetchSeq.current) {
+        setOperations(data)
+        setFetchError(null)
+      }
     } catch (err) {
       if (seq === fetchSeq.current) {
         setOperations(null)
         setFetchError(err)
       }
-    } finally {
-      if (seq === fetchSeq.current) setLoading(false)
     }
   }, [cellId])
 
-  // Switching cells resets everything cell-specific: the previous cell's
-  // filters would otherwise ghost-filter the new cell's log (stale operator
-  // names, possibly a game mode the new cell never played).
-  useEffect(() => {
-    setOperations(null)
-    setSyncResult(null)
-    setFetchError(null)
-    setFilterMode('All')
-    setFilterOutcome('All')
-    setFilterScope('full')
-    setActiveOperators(null)
-  }, [cellId])
+  async function handleRetry() {
+    setRetrying(true)
+    await fetchOps()
+    setRetrying(false)
+  }
 
+  // Fetch on mount / cell change. The lint below is conservative: every
+  // setState in the fetcher runs after a network await (never synchronously
+  // inside this effect body), and fetchSeq discards late responses.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (hasCell) fetchOps()
-    else setOperations(null)
   }, [hasCell, fetchOps])
 
   async function handleSync() {
@@ -212,7 +173,7 @@ export default function OperationLog() {
         if (!p.name) continue
         if (!opMap[p.name]) opMap[p.name] = { wins: 0, games: 0 }
         opMap[p.name].games++
-        if (op.result === 'WIN') opMap[p.name].wins++
+        if (op.cell_members_won) opMap[p.name].wins++
       }
     }
     return Object.entries(opMap)
@@ -220,15 +181,8 @@ export default function OperationLog() {
       .map(([name]) => name)
   }, [operations])
 
-  // Initialize the operator filter to "everyone" once the log arrives.
-  // activeOperators resets to null on cell switch (effect above), so this
-  // re-initializes per cell.
-  useEffect(() => {
-    if (allOperatorNames.length > 0 && activeOperators === null) {
-      setActiveOperators(new Set(allOperatorNames))
-    }
-  }, [allOperatorNames, activeOperators])
-
+  // null = "everyone" (the Full Dossier default); a Set once the user has
+  // narrowed the roster. Derived here rather than initialized by an effect.
   const currentOps = activeOperators ?? new Set(allOperatorNames)
 
   const toggleOperator = (name) => {
@@ -296,77 +250,38 @@ export default function OperationLog() {
   const modes = ['All', ...new Set((operations ?? []).map((o) => resolveMode(o.game_mode, o.queue_id)))]
 
   const currentUserName = user?.user_metadata?.riot_game_name ?? null
+  // user_id first (Riot names change; ids never do), display name as a
+  // case-insensitive fallback for rows the server could not resolve
+  const isYou = (p) => Boolean(
+    (user?.id && p.user_id === user.id) ||
+    (currentUserName && p.name?.toLowerCase() === currentUserName.toLowerCase())
+  )
 
   return (
     <>
       {user && <CellOverlay />}
 
-      <div className="page-header-bar">
-        <div className="page-header">
-          <div>
-            <div className={`eyebrow ${hasCell ? 'eyebrow-green' : ''}`}>
-              &bull; OPERATION LOG &mdash; {hasCell ? 'ACTIVE' : 'INACTIVE'}
-            </div>
-            <h1 className="title-hero page-title">
-              {hasCell ? activeCell.name : <R w={180} h={28} />}
-            </h1>
-            <div className="page-meta">
-              <strong>{hasCell ? (activeCell.member_count ?? 0) : <R w={16} h={11} />}</strong> operator{(hasCell ? activeCell.member_count : 0) !== 1 ? 's' : ''}
-              <span className="meta-divider">//</span>
-              region <strong>{hasCell ? 'NA' : <R w={24} h={11} />}</strong>
-              <span className="meta-divider">//</span>
-              established <strong>{hasCell && activeCell.created_at
-                ? new Date(activeCell.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-                : <R w={90} h={11} />}</strong>
-              <span className="meta-divider">//</span>
-              case <strong>LGN-<R w={36} h={11} /></strong>
-              {hasCell && (
-                <>
-                  <span className="meta-divider">//</span>
-                  <button
-                    className="recruit-btn"
-                    onClick={handleSync}
-                    disabled={syncing}
-                  >
-                    {syncing ? 'SYNCING...' : '+ Sync Intel'}
-                  </button>
-                </>
-              )}
-            </div>
-            {syncResult && (
-              <div className="sync-result" role="status">
-                {syncResult.status === 'ERROR'
-                  ? `SYNC FAILED: ${syncResult.message}`
-                  : syncResult.remaining > 0
-                  ? `INGEST IN PROGRESS — ${syncResult.fetched ?? 0} new matches filed, ${syncResult.remaining} pending. Sync again to continue.`
-                  : `INGEST COMPLETE — ${syncResult.fetched ?? 0} new matches filed, ${syncResult.skipped ?? 0} already on record`}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="OPERATION LOG"
+        hasCell={hasCell}
+        activeCell={activeCell}
+        syncing={syncing}
+        syncResult={syncResult}
+        onSync={handleSync}
+      />
 
       <div className={`page-content${hasCell && !operations && !fetchError ? ' loading' : ''}`}>
 
         {/* ── FETCH FAILURE NOTICE (distinct from loading) ── */}
         {hasCell && fetchError && !operations && (
-          <div className="card fetch-error-card" role="alert">
-            <div className="fetch-error-title">
-              {fetchError.status === 401 ? 'CLEARANCE EXPIRED' : 'RETRIEVAL FAULT'}
-            </div>
-            <p className="fetch-error-note">
-              {fetchError.status === 401
-                ? 'Session credentials have lapsed. Re-authenticate to restore log access.'
-                : 'The operation log could not be retrieved. This is a transmission fault — records remain intact.'}
-            </p>
-            {fetchError.status === 401 ? (
-              <a className="fetch-error-btn" href="/authenticate?return_to=/oplog">RE-AUTHENTICATE</a>
-            ) : (
-              <button className="fetch-error-btn" onClick={fetchOps} disabled={loading}>
-                {loading ? 'RETRYING...' : 'RE-ATTEMPT RETRIEVAL'}
-              </button>
-            )}
-          </div>
+          <FetchFault
+            error={fetchError}
+            loading={retrying}
+            onRetry={handleRetry}
+            returnTo="/oplog"
+            subject="The operation log"
+            access="log access"
+          />
         )}
 
         {/* ── SUMMARY STRIP ── */}
@@ -375,7 +290,7 @@ export default function OperationLog() {
             <div className="summary-card-accent" style={{ background: hasData ? wrAccentColor(jointWR) : 'var(--muted)' }} />
             <div className="summary-label">Joint Win Rate</div>
             <div className="summary-value" style={hasData ? { color: wrAccentColor(jointWR) } : undefined}>
-              {hasData ? `${(jointWR * 100).toFixed(1)}%` : <R w={100} h={36} />}
+              {hasData ? (jointWR == null ? '—' : `${(jointWR * 100).toFixed(1)}%`) : <R w={100} h={36} />}
             </div>
             <div className="summary-sub">
               {hasData ? `across ${filtered.length} matches` : <R w={90} h={10} />}
@@ -388,7 +303,7 @@ export default function OperationLog() {
               {hasData ? totalWins : <R w={60} h={36} />}
             </div>
             <div className="summary-sub">
-              {hasData ? 'current season' : <R w={80} h={10} />}
+              {hasData ? 'current selection' : <R w={80} h={10} />}
             </div>
           </div>
           <div className="summary-card">
@@ -398,7 +313,7 @@ export default function OperationLog() {
               {hasData ? totalLosses : <R w={60} h={36} />}
             </div>
             <div className="summary-sub">
-              {hasData ? 'current season' : <R w={80} h={10} />}
+              {hasData ? 'current selection' : <R w={80} h={10} />}
             </div>
           </div>
           <div className="summary-card">
@@ -503,6 +418,14 @@ export default function OperationLog() {
               </div>
               <div className="scope-notice-ref">Solo Reports Filed: 0</div>
             </div>
+          ) : hasData && filtered.length === 0 ? (
+            <div className="scope-notice">
+              <div className="scope-notice-label">NO MATCHING DEPLOYMENTS</div>
+              <div className="scope-notice-text">
+                No joint deployments on file match the current filters. Adjust the
+                theater, outcome, or operator selection to review deployment history.
+              </div>
+            </div>
           ) : hasData ? (
             grouped.map((group, gi) => (
               <div key={gi}>
@@ -549,7 +472,7 @@ export default function OperationLog() {
                           return allOperatorNames.indexOf(a.name) - allOperatorNames.indexOf(b.name)
                         }).map((p, pi) => (
                           <tr key={pi}>
-                            <td className={`op-name${p.name === currentUserName ? ' you' : ''}`}>
+                            <td className={`op-name${isYou(p) ? ' you' : ''}`}>
                               {p.name}
                             </td>
                             <td>{p.champion}</td>
@@ -594,4 +517,14 @@ export default function OperationLog() {
       <Footer docCode="OPLOG-" office="LEGION/OPS" />
     </>
   )
+}
+
+/**
+ * Remount the log per cell: filters, fetch state, and the sync banner start
+ * fresh, and a slow response or sync for the PREVIOUS cell lands on an
+ * unmounted instance instead of ghost-filtering this one.
+ */
+export default function OperationLog() {
+  const { activeCell } = useAuth()
+  return <OperationLogView key={activeCell?.id ?? 'none'} />
 }

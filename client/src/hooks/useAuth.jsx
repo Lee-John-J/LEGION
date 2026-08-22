@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { api } from '../lib/api'
-import { MOCK_USER, MOCK_CELLS, MOCK_ACTIVE_CELL } from '../lib/mockData'
+import { DEV_MOCK } from '../lib/devMock'
 
 const AuthContext = createContext(null)
 
 const ACTIVE_CELL_KEY = 'legion_active_cell'
-const DEV_MOCK = import.meta.env.DEV
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
@@ -73,70 +72,7 @@ export function AuthProvider({ children }) {
     return data
   }, [fetchCells, restoreActiveCell])
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSession(session)
-        setLoading(false)
-        linkRiotIdIfNeeded(session.user)
-        fetchCells().then(restoreActiveCell)
-      } else if (DEV_MOCK) {
-        setSession({ user: MOCK_USER, access_token: 'mock' })
-        setCells(MOCK_CELLS)
-        setActiveCellState(MOCK_ACTIVE_CELL)
-        setLoading(false)
-        setCellsLoading(false)
-      } else {
-        setSession(null)
-        setLoading(false)
-        setCellsLoading(false)
-      }
-    }).catch(() => {
-      // Never leave the app stuck behind the loading gate if the session
-      // lookup itself rejects — that renders as a permanently blank page.
-      setLoading(false)
-      setCellsLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session && DEV_MOCK) return
-      // User arrived via a password-reset email link: hold them on the
-      // Authenticate page to set a new passcode instead of redirecting.
-      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
-      setSession(session)
-      if (event === 'SIGNED_IN' && session?.user) {
-        linkRiotIdIfNeeded(session.user)
-        fetchCells().then(restoreActiveCell)
-      }
-      if (event === 'SIGNED_OUT') {
-        setCells([])
-        setActiveCell(null)
-        setCellsLoading(false)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [fetchCells, restoreActiveCell, setActiveCell])
-
-  // Re-validate session when the tab becomes visible again (e.g. after sleep)
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState !== 'visible' || DEV_MOCK) return
-      supabase.auth.getSession().then(({ data: { session: fresh } }) => {
-        if (fresh) {
-          setSession(fresh)
-        } else if (session) {
-          setSession(null)
-          setCells([])
-          setActiveCell(null)
-        }
-      })
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [session, setActiveCell])
-
-  async function linkRiotIdIfNeeded(user) {
+  const linkRiotIdIfNeeded = useCallback(async (user) => {
     const name = user.user_metadata?.riot_game_name
     const tag = user.user_metadata?.riot_tag_line
     if (!name || !tag) {
@@ -161,7 +97,82 @@ export function AuthProvider({ children }) {
       console.error(`[LEGION] Riot ID link failed for ${name}#${tag}:`, err.message)
       setRiotLinkError(`RIOT ID LINK FAILED FOR ${name}#${tag}: ${err.message}`)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // Initial session lookup runs once; the auth-state subscription below
+    // owns every later transition (sign-in, sign-out, password recovery).
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setSession(session)
+          setLoading(false)
+          linkRiotIdIfNeeded(session.user)
+          refreshCells()
+        } else if (import.meta.env.DEV) {
+          // Dev preview: fake a signed-in operator on the mock cell. The
+          // literal import.meta.env.DEV gate (not the DEV_MOCK alias — the
+          // bundler only folds the literal) plus the dynamic import keep
+          // mockData.js out of production bundles entirely.
+          const { MOCK_USER, MOCK_CELLS, MOCK_ACTIVE_CELL } = await import('../lib/mockData')
+          setSession({ user: MOCK_USER, access_token: 'mock' })
+          setCells(MOCK_CELLS)
+          setActiveCellState(MOCK_ACTIVE_CELL)
+          setLoading(false)
+          setCellsLoading(false)
+        } else {
+          setSession(null)
+          setLoading(false)
+          setCellsLoading(false)
+        }
+      } catch {
+        // Never leave the app stuck behind the loading gate if the session
+        // lookup itself rejects — that renders as a permanently blank page.
+        setLoading(false)
+        setCellsLoading(false)
+      }
+    }
+    init()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session && DEV_MOCK) return
+      // User arrived via a password-reset email link: hold them on the
+      // Authenticate page to set a new passcode instead of redirecting.
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
+      setSession(session)
+      if (event === 'SIGNED_IN' && session?.user) {
+        linkRiotIdIfNeeded(session.user)
+        refreshCells()
+      }
+      if (event === 'SIGNED_OUT') {
+        setCells([])
+        setActiveCell(null)
+        setCellsLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [refreshCells, setActiveCell, linkRiotIdIfNeeded])
+
+  // Re-validate session when the tab becomes visible again (e.g. after sleep)
+  useEffect(() => {
+    async function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible' || DEV_MOCK) return
+      try {
+        const { data: { session: fresh } } = await supabase.auth.getSession()
+        if (fresh) {
+          setSession(fresh)
+        } else if (session) {
+          setSession(null)
+          setCells([])
+          setActiveCell(null)
+        }
+      } catch { /* transient lookup failure — keep the current session */ }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [session, setActiveCell])
 
   const signUp = useCallback(async (email, password, riotGameName, riotTagLine) => {
     const { data, error } = await supabase.auth.signUp({

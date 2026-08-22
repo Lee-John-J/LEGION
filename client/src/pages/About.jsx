@@ -1,14 +1,6 @@
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
-
-function R({ w, h = 8 }) {
-  return (
-    <>
-      <span className="redacted-inline" aria-hidden="true" style={{ height: h, width: w, verticalAlign: 'middle' }} />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
+import { Redacted as R } from '../components/Redacted'
 
 export default function About() {
   return (
@@ -96,9 +88,9 @@ export default function About() {
               <h3>Designate the cell</h3>
               <p>
                 Name the cell. Up to 10 operators may be associated with a single
-                file. Each additional operator is appended via invite code or by
-                Riot ID; appended operators are tagged for monitoring on a rolling
-                basis.
+                file. Each additional operator is appended via the cell&rsquo;s
+                invite code; appended operators are tagged for monitoring on a
+                rolling basis.
               </p>
             </div>
           </div>
@@ -171,8 +163,7 @@ export default function About() {
             <div className="term-label">ZOO</div>
             <div className="term-arrow">&rarr;</div>
             <div className="term-def">
-              <R w={62} h={13} />. Parent agency. LEGION operates as one of
-              several initiatives under its directive.
+              <R w={62} h={13} />. Parent agency. <R w={118} h={13} />.
             </div>
           </div>
           <div className="term-row">

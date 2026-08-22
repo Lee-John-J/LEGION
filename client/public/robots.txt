@@ -1,0 +1,9 @@
+# LEGION — public pages are indexable; case files require clearance.
+User-agent: *
+Allow: /
+Disallow: /briefing
+Disallow: /oplog
+Disallow: /intake
+Disallow: /api/
+
+Sitemap: https://legion-pi-nine.vercel.app/sitemap.xml

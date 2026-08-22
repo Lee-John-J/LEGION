@@ -50,7 +50,18 @@ function buildCampaign(timeline) {
     }
   }
 
-  const step = (PLOT_RIGHT - PLOT_LEFT - totalGap) / (n - 1)
+  // Dark periods may claim at most 35% of the plot. A sparse cell that plays
+  // one session every other week would otherwise accumulate more band width
+  // than the axis has, driving the per-game step negative.
+  const plotWidth = PLOT_RIGHT - PLOT_LEFT
+  const maxGap = plotWidth * 0.35
+  if (totalGap > maxGap) {
+    const scale = maxGap / totalGap
+    for (const k of Object.keys(gapAt)) gapAt[k] = Math.max(2, gapAt[k] * scale)
+    totalGap = Object.values(gapAt).reduce((a, b) => a + b, 0)
+  }
+
+  const step = (plotWidth - totalGap) / (n - 1)
   const xs = []
   let offset = 0
   for (let i = 0; i < n; i++) {

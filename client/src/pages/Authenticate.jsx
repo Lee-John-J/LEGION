@@ -4,12 +4,47 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import Footer from '../components/Footer'
 
+/**
+ * Only same-origin paths may be used as a post-login destination. The value
+ * is resolved against this origin and must stay here — a prefix check alone
+ * is not enough, because browsers read "/\evil.com" (and its %5C form) as a
+ * cross-origin URL.
+ */
+function safeReturnTo(raw) {
+  if (!raw || !raw.startsWith('/') || raw.includes('\\')) return null
+  try {
+    const url = new URL(raw, window.location.origin)
+    if (url.origin !== window.location.origin) return null
+    return url.pathname + url.search
+  } catch {
+    return null
+  }
+}
+
+// Supabase's raw error strings, translated into the dossier voice. Anything
+// unrecognized falls through verbatim (LEGION's own server errors already
+// arrive in-voice).
+const AUTH_ERROR_COPY = [
+  ['invalid login credentials', 'CREDENTIALS NOT RECOGNIZED. VERIFY EMAIL AND PASSCODE.'],
+  ['email not confirmed', 'IDENTITY UNCONFIRMED. COMPLETE THE CONFIRMATION DIRECTIVE SENT TO YOUR EMAIL.'],
+  ['already registered', 'AN OPERATOR FILE ALREADY EXISTS FOR THIS ADDRESS. AUTHENTICATE INSTEAD.'],
+  ['rate limit', 'REQUEST THROTTLED. STAND BY, THEN RE-SUBMIT.'],
+  ['security purposes', 'REQUEST THROTTLED. STAND BY, THEN RE-SUBMIT.'],
+  ['password should be', 'PASSCODE MUST BE EIGHT CHARACTERS MINIMUM.'],
+  ['valid email', 'EMAIL ADDRESS MALFORMED.'],
+]
+
+function describeAuthError(err) {
+  const msg = err?.message ?? ''
+  const lower = msg.toLowerCase()
+  const hit = AUTH_ERROR_COPY.find(([needle]) => lower.includes(needle))
+  return hit ? hit[1] : (msg || 'REQUEST FAILED.')
+}
+
 export default function Authenticate() {
-  const { signIn, signUp, user, cells, cellsLoading, passwordRecovery, resetPassword, updatePassword } = useAuth()
+  const { signIn, signUp, user, cells, cellsLoading, cellsError, passwordRecovery, resetPassword, updatePassword } = useAuth()
   const [searchParams] = useSearchParams()
-  // Validate return_to to prevent open redirects to external sites
-  const rawReturnTo = searchParams.get('return_to')
-  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : null
+  const returnTo = safeReturnTo(searchParams.get('return_to'))
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,7 +62,9 @@ export default function Authenticate() {
   if (user && cellsLoading && !passwordRecovery) return null
   if (user && !passwordRecovery) {
     if (returnTo) return <Navigate to={returnTo} replace />
-    return <Navigate to={cells.length > 0 ? '/briefing' : '/intake'} replace />
+    // A failed cell fetch is not "no cells": route to the Briefing, whose
+    // overlay offers a retry, instead of steering into a duplicate cell.
+    return <Navigate to={cells.length > 0 || cellsError ? '/briefing' : '/intake'} replace />
   }
 
   function switchMode(next) {
@@ -44,7 +81,7 @@ export default function Authenticate() {
       await resetPassword(email)
       setResetSent(true)
     } catch (err) {
-      setError(err.message)
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -66,7 +103,7 @@ export default function Authenticate() {
       await updatePassword(newPassword)
       // passwordRecovery flips false in useAuth; the redirect above takes over.
     } catch (err) {
-      setError(err.message)
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -80,7 +117,7 @@ export default function Authenticate() {
       await signIn(email, password)
       // The Navigate redirect at the top handles routing once user/cells are loaded
     } catch (err) {
-      setError(err.message)
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -91,11 +128,14 @@ export default function Authenticate() {
     setError(null)
     setLoading(true)
     try {
-      await api.validateRiotId({ riotGameName: riotName, riotTagLine: riotTag })
-      await signUp(email, password, riotName, riotTag)
+      // Enlist under Riot's canonical spelling and casing, not what was
+      // typed — every later identity match (YOU badges, roster rows)
+      // compares against the canonical form the server stores.
+      const verified = await api.validateRiotId({ riotGameName: riotName, riotTagLine: riotTag })
+      await signUp(email, password, verified.gameName ?? riotName, verified.tagLine ?? riotTag)
       setSignUpSuccess(true)
     } catch (err) {
-      setError(err.message)
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -148,7 +188,7 @@ export default function Authenticate() {
                 RECOVERY CHANNEL VERIFIED
               </div>
               <div className="field">
-                <label htmlFor="np-new">NEW PASSWORD</label>
+                <label htmlFor="np-new">NEW PASSCODE</label>
                 <input
                   id="np-new"
                   type="password"
@@ -160,7 +200,7 @@ export default function Authenticate() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="np-confirm">CONFIRM PASSWORD</label>
+                <label htmlFor="np-confirm">CONFIRM PASSCODE</label>
                 <input
                   id="np-confirm"
                   type="password"
@@ -233,7 +273,7 @@ export default function Authenticate() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="si-password">PASSWORD</label>
+                <label htmlFor="si-password">PASSCODE</label>
                 <input
                   id="si-password"
                   type="password"
@@ -247,7 +287,7 @@ export default function Authenticate() {
               </button>
               <div className="forgot-link">
                 <button type="button" className="link-btn" onClick={() => switchMode('reset')}>
-                  Forgot password?
+                  Forgot passcode?
                 </button>
               </div>
             </form>
@@ -267,7 +307,7 @@ export default function Authenticate() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="su-password">PASSWORD</label>
+                <label htmlFor="su-password">PASSCODE</label>
                 <input
                   id="su-password"
                   type="password"

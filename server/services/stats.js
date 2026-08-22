@@ -67,8 +67,8 @@ function getSameTeamCellGroup(participants, puuidSet) {
   // Arena (CHERRY) lobbies are 8 subteams of 2, but Riot still stamps only
   // two teamIds — so cell members sharing a teamId can be OPPONENTS. Riot
   // sets playerSubteamId 1-8 only in Arena (0 elsewhere), so its presence is
-  // the Arena signal; group by subteam there. Mirrors routes/cells.js
-  // /operations, which keys the same decision off gameMode === 'CHERRY'.
+  // the Arena signal; group by subteam there. Shared with routes/cells.js
+  // /operations so the log and the Briefing always agree.
   const isArena = participants.some((p) => (p.playerSubteamId ?? 0) > 0)
 
   // Group cell members by team (Riot API: 100 = blue, 200 = red) or subteam
@@ -397,9 +397,10 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     }
   })
 
-  // ── Tilt Index ──
+  // ── Tilt Index (server-side only) ──
   // Measures post-loss cohesion: how well does the cell perform after a loss?
-  // Uses chronological joint matches to track streaks and recovery.
+  // No longer part of the payload — its only consumer is the SESSION
+  // DISCIPLINE observation below.
   const chronological = [...jointMatches].sort((a, b) => {
     return (a.info?.gameEndTimestamp ?? 0) - (b.info?.gameEndTimestamp ?? 0)
   })
@@ -506,14 +507,13 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
   }
 
   // ── Field Assessments (analyst observations) ──
-  // Generate 6 observation slots: 4 real (data-driven, funniest/most outlying),
-  // 2 redacted (positions chosen randomly). Each observation type has 2-3 copy
-  // variants selected at random for replayability.
+  // Generate 6 observation slots: the top data-driven observations plus one
+  // to three redacted slots (count and positions seeded by the data, see
+  // below). Each observation type has 2-3 copy variants for replayability.
 
   // Deterministic-ish random seeded by match count so it's stable per-refresh
   // but changes as new matches come in
   const seed = jointMatches.length * 7 + cellPuuids.length * 13
-  function pick(arr) { return arr[(seed + arr.length) % arr.length] }
   function pickIdx(arr, offset) { return arr[(seed + offset) % arr.length] }
 
   const candidates = [] // { weight, obs }
@@ -750,8 +750,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
 
     // ─── TYPE: WIN STREAK CEILING ───
     let maxWinStreak = 0, currentWinStreak = 0
-    const chrono = [...jointMatches].sort((a, b) => (a.info?.gameEndTimestamp ?? 0) - (b.info?.gameEndTimestamp ?? 0))
-    for (const m of chrono) {
+    for (const m of chronological) {
       const cellTeam = getSameTeamCellGroup(m.info?.participants ?? [], puuidSet)
       if (cellTeam && cellTeam[0].win) { currentWinStreak++; maxWinStreak = Math.max(maxWinStreak, currentWinStreak) }
       else currentWinStreak = 0
@@ -925,7 +924,6 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     heatmap,
     recent_form,
     timeline,
-    tilt_index,
     assessments,
   }
 }

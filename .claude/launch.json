@@ -19,8 +19,9 @@
     {
       "name": "mockups",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", ".", "-p", "3333", "-c-1"],
+      "runtimeArgs": ["http-server", ".", "-c-1"],
       "port": 3333,
+      "autoPort": true,
       "cwd": "mockups"
     }
   ]

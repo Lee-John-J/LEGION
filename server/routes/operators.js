@@ -2,6 +2,7 @@ const express = require('express')
 const https = require('https')
 const router = express.Router()
 const { supabase } = require('../db/supabase')
+const { requireAuth } = require('../middleware/auth')
 
 // Typed Riot API failure so route handlers can tell "user typed a bad
 // Riot ID" apart from "our key is bad" and "Riot is down".
@@ -37,7 +38,7 @@ function lookupRiotAccount(gameName, tagLine) {
         if (res.statusCode === 401 || res.statusCode === 403) {
           // Our problem, not the user's: missing/expired RIOT_API_KEY.
           // Never log the key value itself.
-          console.error(`[riot] auth failure (${res.statusCode}) — check RIOT_API_KEY in this environment`)
+          console.error(`[RIOT] auth failure (${res.statusCode}) — check RIOT_API_KEY in this environment`)
           return reject(new RiotApiError('BAD_KEY', res.statusCode))
         }
         if (res.statusCode === 429) return reject(new RiotApiError('RATE_LIMITED', 429))
@@ -61,17 +62,22 @@ function sendRiotError(res, err) {
   if (err.kind === 'RATE_LIMITED') {
     return res.status(429).json({ code: 'RATE_LIMITED', error: 'INTAKE QUEUE SATURATED. STAND BY, THEN RE-SUBMIT.' })
   }
-  console.error('[riot] lookup failed:', err.kind, err.status)
+  console.error('[RIOT] lookup failed:', err.kind, err.status)
   return res.status(503).json({ code: 'RIOT_UNAVAILABLE', error: 'RIOT API UNAVAILABLE. TRY AGAIN SHORTLY.' })
 }
 
-async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'AUTHENTICATION REQUIRED' })
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return res.status(401).json({ error: 'CLEARANCE DENIED' })
-  req.user = user
-  next()
+// ── Riot ID shape check ──────────────────────────────────────────
+// Riot enforces 3-16 characters for game names and 3-5 for tag lines.
+// Checking the shape here keeps non-strings and overlong junk from ever
+// becoming Riot lookups or cache keys.
+const RIOT_ID_ERROR = 'RIOT ID REQUIRED: GAME NAME (3-16 CHARACTERS) + TAG (3-5).'
+
+function parseRiotId(body) {
+  const riotGameName = typeof body?.riotGameName === 'string' ? body.riotGameName.trim() : ''
+  const riotTagLine = typeof body?.riotTagLine === 'string' ? body.riotTagLine.trim().replace(/^#/, '') : ''
+  if (riotGameName.length < 3 || riotGameName.length > 16) return null
+  if (riotTagLine.length < 3 || riotTagLine.length > 5) return null
+  return { riotGameName, riotTagLine }
 }
 
 // ── Abuse guards for the public validate endpoint ────────────────
@@ -103,6 +109,11 @@ function throttleValidate(req, res, next) {
 const validateCache = new Map() // "name#tag" lowercased -> { hit, ts }
 const VALIDATE_CACHE_TTL = 5 * 60 * 1000
 
+function setCachedValidation(key, hit) {
+  if (validateCache.size > 5000) validateCache.clear() // bound memory
+  validateCache.set(key, { hit, ts: Date.now() })
+}
+
 function getCachedValidation(key) {
   const entry = validateCache.get(key)
   if (!entry) return null
@@ -116,10 +127,9 @@ function getCachedValidation(key) {
 // POST /operators/validate-riot-id — public pre-signup check (no auth required,
 // so it is throttled per IP and results are cached — see guards above)
 router.post('/validate-riot-id', throttleValidate, async (req, res) => {
-  const { riotGameName, riotTagLine } = req.body
-  if (!riotGameName || !riotTagLine) {
-    return res.status(400).json({ error: 'RIOT ID REQUIRED: gameName + tagLine' })
-  }
+  const riotId = parseRiotId(req.body)
+  if (!riotId) return res.status(400).json({ error: RIOT_ID_ERROR })
+  const { riotGameName, riotTagLine } = riotId
 
   const cacheKey = `${riotGameName}#${riotTagLine}`.toLowerCase()
   const cached = getCachedValidation(cacheKey)
@@ -131,13 +141,13 @@ router.post('/validate-riot-id', throttleValidate, async (req, res) => {
   try {
     const account = await lookupRiotAccount(riotGameName, riotTagLine)
     const hit = { valid: true, gameName: account.gameName, tagLine: account.tagLine }
-    validateCache.set(cacheKey, { hit, ts: Date.now() })
+    setCachedValidation(cacheKey, hit)
     res.json(hit)
   } catch (err) {
     // Cache only the stable outcome (the ID genuinely doesn't exist);
     // transient Riot failures should retry on the next attempt.
     if (err.kind === 'NOT_FOUND') {
-      validateCache.set(cacheKey, { hit: { valid: false }, ts: Date.now() })
+      setCachedValidation(cacheKey, { valid: false })
     }
     return sendRiotError(res, err)
   }
@@ -146,10 +156,9 @@ router.post('/validate-riot-id', throttleValidate, async (req, res) => {
 router.post('/link', requireAuth, async (req, res) => {
   try {
     const sb = supabase
-    const { riotGameName, riotTagLine } = req.body
-    if (!riotGameName || !riotTagLine) {
-      return res.status(400).json({ error: 'RIOT ID REQUIRED: gameName + tagLine' })
-    }
+    const riotId = parseRiotId(req.body)
+    if (!riotId) return res.status(400).json({ error: RIOT_ID_ERROR })
+    const { riotGameName, riotTagLine } = riotId
 
     // Short-circuit: the client pings /link on every page load (see
     // useAuth.linkRiotIdIfNeeded). When this user's operator row already

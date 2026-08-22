@@ -1,11 +1,4 @@
-function R({ w, h = 8 }) {
-  return (
-    <>
-      <span className="redacted-inline" aria-hidden="true" style={{ height: h, width: w }} />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
+import { Redacted as R } from './Redacted'
 
 export default function Footer({ docCode = '', office = 'LEGION/OPS', extra }) {
   return (

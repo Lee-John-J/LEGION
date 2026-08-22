@@ -1,35 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
-import { MOCK_STATS, isMockCell } from '../lib/mockData'
+import { isMockCell } from '../lib/devMock'
+import { STAPLE_MODES, resolveMode } from '../lib/modes'
+import { useClipboard } from '../hooks/useClipboard'
 import CellOverlay from '../components/CellOverlay'
 import CampaignRecord from '../components/CampaignRecord'
 import Footer from '../components/Footer'
+import PageHeader from '../components/PageHeader'
+import FetchFault from '../components/FetchFault'
+import { Redacted, RedactedBar } from '../components/Redacted'
 
-/* ── Redacted placeholder helpers ──
-   aria-hidden + sr-only text: a screen reader hears "[redacted]" instead of
-   a dangling label followed by silence. */
-function R({ w, h = 12 }) {
-  return (
-    <>
-      <span
-        className="redacted-inline"
-        aria-hidden="true"
-        style={{ width: w, height: h, padding: 0, verticalAlign: 'middle' }}
-      />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
-
-function RedactedBar({ w = '100%', h = 12 }) {
-  return (
-    <>
-      <div className="redacted-bar" aria-hidden="true" style={{ width: w, height: h }} />
-      <span className="sr-only">[redacted]</span>
-    </>
-  )
-}
+// Briefing redactions are flush (no inline padding) so their widths match
+// the stat values they stand in for
+const R = (props) => <Redacted h={12} pad={false} {...props} />
 
 /* ── Formatting helpers ── */
 function pct(n) {
@@ -57,29 +41,6 @@ function modeWrClass(rate) {
   if (r === 0.50) return 'wr-neutral'
   if (r >= 0.40) return 'wr-mid'
   return 'wr-low'
-}
-
-/* ── Mode name normalization ── */
-const STAPLE_MODES = ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'ARAM Mayhem', 'Arena']
-
-function normModeName(raw) {
-  // stats.js now resolves mode names server-side using queueId,
-  // so the value is already human-readable (e.g., "Ranked", "ARAM Mayhem")
-  // This fallback handles any raw gameMode strings that slip through
-  const map = {
-    CLASSIC: 'Normal',
-    RANKED: 'Ranked',
-    RANKED_FLEX: 'Ranked Flex',
-    ARAM: 'ARAM',
-    CHERRY: 'Arena',
-    NEXUSBLITZ: 'Nexus Blitz',
-    URF: 'URF',
-    ARURF: 'ARURF',
-    ULTBOOK: 'Ultimate Spellbook',
-    ODIN: 'Dominion',
-    ONEFORALL: 'One for All',
-  }
-  return map[raw?.toUpperCase?.()] || raw
 }
 
 /* ── Champion pool classification ── */
@@ -256,12 +217,15 @@ function buildLinkSVG(ops, duoStats) {
   return { active, inactive, positions, inactivePositions, edges, pairSummary, n, cx, cy, boxW: 400, boxH: 370 }
 }
 
-export default function Briefing() {
+function BriefingView() {
   const { user, activeCell, riotLinkError } = useAuth()
   const [stats, setStats] = useState(null)
+  // Wall-clock moment the stats arrived. "Active" status is judged against
+  // it rather than against Date.now() during render, which keeps render pure.
+  const [fetchedAt, setFetchedAt] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [fetchError, setFetchError] = useState(null)
   // Index of the active operator being hovered in Link Analysis (null = none)
   const [hoverOp, setHoverOp] = useState(null)
@@ -274,14 +238,26 @@ export default function Briefing() {
   // overwrite the current cell's data (cell-switch race).
   const fetchSeq = useRef(0)
 
+  // Nothing sets state before the first await: this runs from an effect,
+  // and React's lint (react-hooks/set-state-in-effect) rightly objects to
+  // cascading renders kicked off synchronously inside effect bodies.
   const fetchStats = useCallback(async () => {
     if (!cellId) return
     const seq = ++fetchSeq.current
-    setLoading(true)
-    setFetchError(null)
     try {
-      const data = isMockCell(cellId) ? MOCK_STATS : await api.getCellStats(cellId)
-      if (seq === fetchSeq.current) setStats(data)
+      let data
+      if (import.meta.env.DEV && isMockCell(cellId)) {
+        // Dev preview only — the build-time gate + dynamic import keep the
+        // mock dataset out of production bundles
+        data = (await import('../lib/mockData')).MOCK_STATS
+      } else {
+        data = await api.getCellStats(cellId)
+      }
+      if (seq === fetchSeq.current) {
+        setStats(data)
+        setFetchError(null)
+        setFetchedAt(Date.now())
+      }
     } catch (err) {
       // Surface the failure — a swallowed error is indistinguishable from
       // loading forever, and the user can't report what they can't see.
@@ -289,22 +265,21 @@ export default function Briefing() {
         setStats(null)
         setFetchError(err)
       }
-    } finally {
-      if (seq === fetchSeq.current) setLoading(false)
     }
   }, [cellId])
 
-  // Clear per-cell state the moment the active cell changes, so cell A's
-  // stats or sync banner never linger under cell B's header.
-  useEffect(() => {
-    setStats(null)
-    setSyncResult(null)
-    setFetchError(null)
-  }, [cellId])
+  async function handleRetry() {
+    setRetrying(true)
+    await fetchStats()
+    setRetrying(false)
+  }
 
+  // Fetch on mount / cell change. The lint below is conservative: every
+  // setState in the fetcher runs after a network await (never synchronously
+  // inside this effect body), and fetchSeq discards late responses.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (hasCell) fetchStats()
-    else setStats(null)
   }, [hasCell, fetchStats])
 
   async function handleSync() {
@@ -325,6 +300,14 @@ export default function Briefing() {
   // Determine the current user's name from operator_stats by matching user metadata
   const currentUserName = user?.user_metadata?.riot_game_name || user?.email?.split('@')[0] || ''
 
+  // Is this operator row the viewing user? user_id first (Riot names change;
+  // ids never do), display name only as a fallback for older payloads.
+  const isCurrentUser = (op) => Boolean(
+    (user?.id && op.user_id === user.id) ||
+    (currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase())
+  )
+  const { copied: inviteCopied, copy: copyInvite } = useClipboard()
+
   // Split game modes into staple / rotating
   // Always show all staple modes even if no data (0 games)
   const { stapleModes, rotatingModes } = useMemo(() => {
@@ -332,7 +315,7 @@ export default function Briefing() {
     const dataByName = new Map()
     const rotating = []
     stats.game_mode_breakdown.forEach(m => {
-      const name = normModeName(m.mode)
+      const name = resolveMode(m.mode)
       if (STAPLE_MODES.includes(name)) dataByName.set(name, { ...m, name })
       else rotating.push({ ...m, name })
     })
@@ -348,7 +331,10 @@ export default function Briefing() {
     if (!hasData || !stats.heatmap) return null
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
-    // Shift UTC heatmap to local timezone
+    // Shift UTC heatmap to local timezone. Deliberately uses today's offset
+    // for the whole season and rounds half-hour zones to the nearest hour:
+    // an hourly grid cannot express either distinction, so a per-match
+    // "fix" would only move cells by one column.
     const offsetHours = Math.round(-new Date().getTimezoneOffset() / 60)
     const localMap = Array.from({ length: 7 }, () => Array(24).fill(0))
     for (let utcDay = 0; utcDay < 7; utcDay++) {
@@ -434,56 +420,21 @@ export default function Briefing() {
     (stats.win_rate_together <= 1 ? stats.win_rate_together : stats.win_rate_together / 100) > 0.5 ? 'positive' : ''
   ) : ''
 
+  // An operator is "Active" if they deployed within the week before this fetch
+  const sevenDaysAgo = (fetchedAt ?? 0) - 7 * 24 * 60 * 60 * 1000
+
   return (
     <>
       {user && <CellOverlay />}
 
-      {/* ── PAGE HEADER BAR ── */}
-      <div className="page-header-bar">
-        <div className="page-header">
-          <div>
-            <div className={`eyebrow ${hasCell ? 'eyebrow-green' : ''}`}>
-              &bull; CELL BRIEFING &mdash; {hasCell ? 'ACTIVE' : 'INACTIVE'}
-            </div>
-            <h1 className="title-hero page-title">
-              {hasCell ? activeCell.name : <R w={180} h={28} />}
-            </h1>
-            <div className="page-meta">
-              <strong>{hasCell ? (activeCell.member_count ?? 0) : <R w={16} h={11} />}</strong>
-              {' '}operator{(hasCell ? activeCell.member_count : 0) !== 1 ? 's' : ''}
-              <span className="meta-divider">//</span>
-              region <strong>{hasCell ? 'NA' : <R w={24} h={11} />}</strong>
-              <span className="meta-divider">//</span>
-              established <strong>{hasCell && activeCell.created_at
-                ? new Date(activeCell.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-                : <R w={90} h={11} />}</strong>
-              <span className="meta-divider">//</span>
-              case <strong>LGN-<R w={36} h={11} /></strong>
-              {hasCell && (
-                <>
-                  <span className="meta-divider">//</span>
-                  <button
-                    className="recruit-btn"
-                    onClick={handleSync}
-                    disabled={syncing}
-                  >
-                    {syncing ? 'SYNCING...' : '+ Sync Intel'}
-                  </button>
-                </>
-              )}
-            </div>
-            {syncResult && (
-              <div className="sync-result" role="status">
-                {syncResult.status === 'ERROR'
-                  ? `SYNC FAILED: ${syncResult.message}`
-                  : syncResult.remaining > 0
-                  ? `INGEST IN PROGRESS — ${syncResult.fetched ?? 0} new matches filed, ${syncResult.remaining} pending. Sync again to continue.`
-                  : `INGEST COMPLETE — ${syncResult.fetched ?? 0} new matches filed, ${syncResult.skipped ?? 0} already on record`}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="CELL BRIEFING"
+        hasCell={hasCell}
+        activeCell={activeCell}
+        syncing={syncing}
+        syncResult={syncResult}
+        onSync={handleSync}
+      />
 
       <div className={`dashboard${hasCell && !stats && !fetchError ? ' loading' : ''}`}>
 
@@ -500,23 +451,14 @@ export default function Briefing() {
 
         {/* ── FETCH FAILURE NOTICE (distinct from loading) ── */}
         {hasCell && fetchError && !stats && (
-          <div className="card fetch-error-card" role="alert">
-            <div className="fetch-error-title">
-              {fetchError.status === 401 ? 'CLEARANCE EXPIRED' : 'RETRIEVAL FAULT'}
-            </div>
-            <p className="fetch-error-note">
-              {fetchError.status === 401
-                ? 'Session credentials have lapsed. Re-authenticate to restore briefing access.'
-                : 'Field reports could not be retrieved. This is a transmission fault — records remain intact.'}
-            </p>
-            {fetchError.status === 401 ? (
-              <a className="fetch-error-btn" href="/authenticate?return_to=/briefing">RE-AUTHENTICATE</a>
-            ) : (
-              <button className="fetch-error-btn" onClick={fetchStats} disabled={loading}>
-                {loading ? 'RETRYING...' : 'RE-ATTEMPT RETRIEVAL'}
-              </button>
-            )}
-          </div>
+          <FetchFault
+            error={fetchError}
+            loading={retrying}
+            onRetry={handleRetry}
+            returnTo="/briefing"
+            subject="Field reports"
+            access="briefing access"
+          />
         )}
 
         {/* ── INVITE CODE BANNER (collapsible) ── */}
@@ -533,10 +475,10 @@ export default function Briefing() {
                 <code className="invite-code-display">{activeCell.invite_code}</code>
                 <button
                   className="invite-copy-btn"
-                  onClick={() => navigator.clipboard.writeText(activeCell.invite_code)}
+                  onClick={() => copyInvite(activeCell.invite_code)}
                   title="Copy to clipboard"
                 >
-                  COPY
+                  {inviteCopied ? 'COPIED' : 'COPY'}
                 </button>
                 <button
                   className="invite-collapse-btn"
@@ -648,12 +590,7 @@ export default function Briefing() {
             <tbody>
               {hasData && stats.operator_stats ? (
                 stats.operator_stats.map((op) => {
-                  // user_id first (Riot names change), name as fallback
-                  const isYou = Boolean(
-                    (user?.id && op.user_id === user.id) ||
-                    (currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase())
-                  )
-                  const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+                  const isYou = isCurrentUser(op)
                   const isActive = op.last_played != null && op.last_played > sevenDaysAgo
                   return (
                     <tr key={op.puuid} className={isYou ? 'cm-you' : ''}>
@@ -780,7 +717,7 @@ export default function Briefing() {
                 )}
               </>
             ) : (
-              ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'Arena'].map(mode => (
+              STAPLE_MODES.map(mode => (
                 <div className="mode-row" key={mode}>
                   <div className="mode-name">{mode}</div>
                   <div className="mode-bar-wrap">
@@ -806,7 +743,7 @@ export default function Briefing() {
         </div>
 
         {/* ════════════════════════════
-            DUO MATRIX + HEATMAP
+            LINK ANALYSIS + ACTIVITY HEATMAP
             ════════════════════════════ */}
         <div className="two-col intel-reveal reveal-d2">
 
@@ -817,11 +754,13 @@ export default function Briefing() {
             <div className="panel-body">
               <div className="link-svg-wrap">
                 {linkData ? (
+                  // role="group", not "img": img would hide the focusable
+                  // operator nodes inside from assistive technology
                   <svg
                     className="link-svg data-reveal"
                     viewBox={`0 0 ${linkData.boxW} ${linkData.boxH}`}
                     xmlns="http://www.w3.org/2000/svg"
-                    role="img"
+                    role="group"
                     aria-label={`Joint win rate by operator pair. ${linkData.pairSummary || 'No pair data on file yet.'}`}
                   >
                     {/* Edges — complete graph; stats appear on hover only */}
@@ -1059,7 +998,7 @@ export default function Briefing() {
             <div className="pools-grid">
               {hasData && stats.operator_stats ? (
                 stats.operator_stats.map((op) => {
-                  const isYou = currentUserName && op.name?.toLowerCase() === currentUserName.toLowerCase()
+                  const isYou = isCurrentUser(op)
                   const totalGames = op.games || 0
                   const allChamps = op.top_champions || []
 
@@ -1075,7 +1014,6 @@ export default function Briefing() {
                   const roleTotal = Object.values(roleDist).reduce((a, b) => a + b, 0)
 
                   const ROLE_DISPLAY = { TOP: 'TOP', JUNGLE: 'JGL', MIDDLE: 'MID', BOTTOM: 'BOT', UTILITY: 'SUP' }
-                  const ROLE_COLORS = { TOP: 'role-top', JUNGLE: 'role-jgl', MIDDLE: 'role-mid', BOTTOM: 'role-bot', UTILITY: 'role-sup' }
 
                   const primaryRoleLabel = op.primary_role ? ROLE_DISPLAY[op.primary_role] || op.primary_role : null
                   const primaryClassLabel = op.primary_class || null
@@ -1334,14 +1272,7 @@ export default function Briefing() {
               </div>
 
               {/* Analyst signature footer */}
-              <div style={{
-                marginTop: 28, paddingTop: 18,
-                borderTop: '1px dashed var(--border)',
-                display: 'flex', gap: 18, flexWrap: 'wrap',
-                justifyContent: 'space-between',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '10.5px', letterSpacing: '1.8px', color: 'var(--muted)',
-              }}>
+              <div className="analyst-signature">
                 <span>ANALYST OF RECORD: <span className="redacted-inline" style={{ height: 10, width: 88 }} /></span>
                 <span>VERIFIED BY: <span className="redacted-inline" style={{ height: 10, width: 74 }} /></span>
                 <span>FILED: {new Date().toISOString().slice(0, 10)} <span className="redacted-inline" style={{ height: 10, width: 34 }} /></span>
@@ -1355,4 +1286,15 @@ export default function Briefing() {
       <Footer docCode="BRIEF-" office="LEGION/OPS" />
     </>
   )
+}
+
+/**
+ * Remount the dashboard per cell. Every piece of per-cell state (stats, sync
+ * banner, fetch error, hover isolation, banner toggle) then starts fresh, and
+ * a slow stats response or long-running sync for the PREVIOUS cell lands on
+ * an unmounted instance instead of overwriting this one.
+ */
+export default function Briefing() {
+  const { activeCell } = useAuth()
+  return <BriefingView key={activeCell?.id ?? 'none'} />
 }
