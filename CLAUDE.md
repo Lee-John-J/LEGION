@@ -928,6 +928,7 @@ Resolved during build (on record so they are not re-litigated):
 ```
 LEGION/
 ├── CLAUDE.md                              <- THIS FILE (single source of truth)
+├── LAUNCH.md                              <- launch tracker: accounts/third parties + pre-launch checklist (open every session)
 ├── README.md                              <- public GitHub readme (OG banner, CI badge, quickstart, env table)
 ├── supabase_schema.sql                    <- database schema (re-runnable; in sync with the live DB since Phase 1)
 ├── vercel.json                            <- Vercel build + rewrites (/api/* -> function, SPA fallback) + asset caching + security headers
