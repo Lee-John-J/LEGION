@@ -999,6 +999,15 @@ footer.site-footer {
   flex-direction: row; gap: 14px; flex-wrap: wrap;
 }
 
+/* ── Legal pages (/privacy, /terms): the About layout plus a closing gap
+   (no CTA band) and a visible cue on in-text links ── */
+.section.legal-body { padding-bottom: 40px; }
+.legal-body a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* =================================================================
    AUTHENTICATE PAGE
    ================================================================= */
