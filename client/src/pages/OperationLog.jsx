@@ -26,7 +26,7 @@ function RedactedMatchRow() {
         <thead>
           <tr>
             <th scope="col">Operator</th>
-            <th scope="col">Champion</th>
+            <th scope="col" className="op-champ">Champion</th>
             <th scope="col">KDA</th>
             <th scope="col" className="col-num">Damage</th>
             <th scope="col" className="col-num">Gold</th>
@@ -36,7 +36,7 @@ function RedactedMatchRow() {
           {[130, 110, 100].map((w, i) => (
             <tr key={i}>
               <td><R w={w} h={12} /></td>
-              <td><R w={60} h={12} /></td>
+              <td className="op-champ"><R w={60} h={12} /></td>
               <td><R w={70} h={12} /></td>
               <td className="col-num"><R w={40} h={12} /></td>
               <td className="col-num"><R w={36} h={12} /></td>
@@ -457,7 +457,7 @@ function OperationLogView() {
                       <thead>
                         <tr>
                           <th scope="col">Operator</th>
-                          <th scope="col">Champion</th>
+                          <th scope="col" className="op-champ">Champion</th>
                           <th scope="col">KDA</th>
                           <th scope="col" className="col-num">Damage</th>
                           <th scope="col" className="col-num">Gold</th>
@@ -472,11 +472,15 @@ function OperationLogView() {
                           return allOperatorNames.indexOf(a.name) - allOperatorNames.indexOf(b.name)
                         }).map((p, pi) => (
                           <tr key={pi}>
-                            <td className={`op-name${isYou(p) ? ' you' : ''}`}>
-                              {p.name}
+                            <td className="op-who">
+                              <span className={`op-name${isYou(p) ? ' you' : ''}`}>{p.name}</span>
+                              {/* Phones hide the Champion column and show it here */}
+                              <span className="op-champ-inline">{p.champion}</span>
                             </td>
-                            <td>{p.champion}</td>
-                            <td className="op-kda">{p.kills} / {p.deaths} / {p.assists}</td>
+                            <td className="op-champ">{p.champion}</td>
+                            <td className="op-kda">
+                              {p.kills}<span className="kda-sep">/</span>{p.deaths}<span className="kda-sep">/</span>{p.assists}
+                            </td>
                             <td className="op-dmg col-num">{formatDamage(p.damage)}</td>
                             <td className="op-gold col-num">{formatDamage(p.gold)}</td>
                           </tr>

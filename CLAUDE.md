@@ -178,8 +178,38 @@ and is never explained in the UI.
 - Redacted bars (black inline rectangles) for decorative empty states — no "REDACTED" label inside (gov-doc convention)
 - Elevation via subtle box shadows, not heavy borders
 - Grid background pattern (`body.bg-grid-page`) on all pages — faint slate grid, fixed attachment
+  (scroll attachment on touch screens, where fixed backgrounds jank or are ignored)
 - Text never relies on reduced opacity for hierarchy — use `--muted` ink
   (WCAG 1.4.3; the 2026-08-21 pass replaced the last three opacity-dimmed labels)
+
+### Mobile / Responsive (mobile pass 2026-09-27)
+`index.css` is desktop-first: the base rules are the desktop layout and the
+`RESPONSIVE` section at the end narrows it, widest first. Named stops:
+`1180` / `1040` tighten the full header (the user badge hides at 1040), `900`
+compact header + single-column Link/Heatmap row, `720` phone + small tablet
+(gutters, 2-col strips, static page header), `560` phone (table rewrites,
+chart canvases — `PHONE_QUERY` in `hooks/useMediaQuery.js` must match it),
+`380` small phone (320px class). Rules the whole app keeps:
+- No horizontal page scroll at any width from 320px up — verified across every
+  route, signed in / signed out / solo cell, with the menu and switcher open
+- Phone gutters are 16px (20px at 561-720); tap targets are >= 40px (chips 38px)
+- Inputs are 16px on phones — iOS zooms the page into any smaller field
+- Data tables fit the screen instead of scrolling sideways: the roster drops
+  its STATUS column (dot beside the name) and uses short headers (`OPS`, `WR`,
+  `W/O`); match tables fold the champion under the operator name and tighten
+  KDA to `12/3/8`. `.table-scroll` remains only as the last-resort fallback
+- SVG charts never scale a desktop canvas down onto a phone (labels would
+  render at 4-7px): Campaign Record draws at its measured width (1 unit = 1px)
+  under 680px, Link Analysis switches to a 340x326 compact canvas with larger
+  type and labels centred above/below each node
+- Hover-only effects (card lift, chip tint) sit behind `@media (hover: hover)`;
+  on touch screens hover tooltips (pool segments, heatmap cells) anchor to their
+  whole bar or grid so a tap near an edge never pushes them off-screen, and
+  copy that names the pointer swaps "Hover" for "Tap" (`.copy-hover` / `.copy-touch`)
+- Overlays (`CellOverlay`, `ConfirmModal`) scroll when taller than the screen;
+  the confirm dialog sits high on phones so the keyboard never covers it
+- `theme-color` is the header ink (`#161616`) so mobile browser chrome blends
+  into the sticky dark header
 
 ### Redaction Conventions
 - One shared component, `components/Redacted.jsx`: `<Redacted w h />` (inline
@@ -443,7 +473,9 @@ public routes (`/`, `/about`, `/authenticate`, `/privacy`, `/terms`).
 ## SITE-WIDE CHROME
 
 ### Dark Site Header
-Sticky to viewport top on all pages. Left-to-right:
+Sticky to viewport top on all pages. `--header-h` always equals its rendered
+height (78px; 60px at <= 900px) — the page header and overlays offset by it.
+Left-to-right:
 
 1. **LEGION wordmark** — links to `/`
 2. **Cell switcher** (`.cell-switcher`):
@@ -463,6 +495,20 @@ Sticky to viewport top on all pages. Left-to-right:
    - Logged out: `Authenticate` CTA (hidden while already on `/authenticate`)
    - Logged in: user badge (`riot name #tag`), `Disengage` button
 
+**Compact header (<= 900px — phones and tablets):** one 60px row — wordmark
+(full-height tap target), cell switcher (name truncates with an ellipsis;
+hidden when logged out, since it is only a redaction), `Authenticate` CTA when
+logged out, and a menu toggle (`.menu-toggle`: three uneven "redaction" bars
+that close into an X; `aria-expanded` / `aria-controls="site-menu"`). The
+toggle opens `#site-menu`, a dark disclosure panel under the bar: the three
+nav links as `01 BRIEFING` / `02 OPERATION LOG` / `03 ABOUT` rows (active one
+white with a dot), then, logged in, `OPERATOR ON FILE <name> #tag` and
+`Disengage`. A dim backdrop covers the page; any link or button inside,
+Escape (focus returns to the toggle), or a tap outside closes it. Opening the
+menu closes the switcher and vice versa. The switcher dropdown pins under the
+bar at full width (12px insets) and scrolls in place; its manage toggle, row,
+REMOVE, and DISSOLVE targets grow to >= 44px.
+
 Handler actions (dissolve cell, remove operator) confirm through the
 type-the-name `ConfirmModal` (dialog semantics, focus trap, Escape). A failed
 action reports inside the dialog (`.confirm-error`, `role=alert`) and keeps it
@@ -470,7 +516,11 @@ open; the CONFIRM button reads `EXECUTING...` and blocks double-submits while
 the request is out. Never `alert()`.
 
 ### Sticky Page Header (Briefing + Operation Log only)
-Shared component `components/PageHeader.jsx`, sticky below the dark header:
+Shared component `components/PageHeader.jsx`, sticky below the dark header
+(static — scrolls away — at <= 720px wide or <= 560px tall, i.e. phones and
+phones in landscape). Each meta fact is a no-wrap unit carrying its own `//`,
+so narrow screens break between facts; on phones `+ Sync Intel` drops to its
+own line as a 40px button:
 - Eyebrow: `• CELL BRIEFING — ACTIVE` / `• OPERATION LOG — ACTIVE`
   (`— INACTIVE` with no active cell)
 - H1: active cell name
@@ -612,7 +662,11 @@ top-to-bottom:
      WITHOUT —`. Rows arrive server-sorted (win rate desc, then games);
      STATUS is `Active` when `last_played` is within seven days of the fetch;
      zero-game members show `—`; the WITHOUT column shows a value only on the
-     viewer's row (every other row is a redacted block)
+     viewer's row (every other row is a redacted block). Phones (<= 560px):
+     `OPERATOR | OPS | WR | W/O`, STATUS folded into a dot before the name
+     (sr-only `Active` / `Inactive` alongside)
+   - Summary strip reflows to 2 x 2 at <= 720px; on phones Joint WR and Recent
+     Form span the full width with WR Without You | Deployments between them
    - Viewing operator highlighted with `YOU` badge — matched by `user_id`
      first (Riot names change; ids never do), display name as fallback
 5. **Game Mode Breakdown card:**
@@ -634,11 +688,17 @@ top-to-bottom:
      `UNLINKED` on hover. Hovering, focusing, tapping, or pressing Enter/Space
      on an operator isolates them: their pills enlarge to add `N OPS` and the
      bond class (`CORE` / `STABLE` / `VOLATILE` / `STRAINED` / `EMERGING`),
-     unrelated edges fade to 7% and other nodes to 50%
+     unrelated edges fade to 7% and other nodes to 50%. Name labels carry a
+     paper halo so they stay legible where they cross an edge. Phones draw
+     a compact 340x326 canvas (`LINK_SIZES` in `Briefing.jsx`): larger type,
+     labels centred above (top half) or below each node. The subtitle says
+     "Tap" instead of "Hover" on touch screens
    - **Activity Heatmap** (right): 7-day x 24-hour grid, shifted from UTC to
      the viewer's timezone and reordered Monday-first (`role=img`, computed
      summary). Subtitle shows the tz abbreviation and `// PEAK <DAY> <HOUR>`;
-     cells tooltip `<DAY> <hour>: N games`. Slate scale `h-0` through `h-5`
+     cells tooltip `<DAY> <hour>: N game(s)` (on touch screens the tooltip
+     spans the grid's width above it). Slate scale `h-0` through `h-5`
+   - The row is a single column at <= 900px
 7. **Campaign Record card (full width, `components/CampaignRecord.jsx`):**
    - Season trend chart on a GAME-TIME axis: one step per joint deployment,
      so the line never breaks during idle spells
@@ -655,6 +715,8 @@ top-to-bottom:
      longest loss slump in red) with paper-halo text so gridlines never cover them
    - Records footnote: best run, worst slump, peak weekly volume, with dates
    - Hover/tap: black dashed crosshair + tooltip (game #, date, result, rolling WR)
+   - Under 680px of panel width the chart is drawn at its measured width
+     (1 unit = 1px) so axis, month, and streak labels keep 10.5px type
    - Placeholder grid under two games. Data source: `timeline` array
      ({ts, win} per joint match) in the stats payload
 8. **Behavioral Intelligence section header** (eyebrow `ANALYST NOTES`) —
@@ -711,7 +773,9 @@ Joint match history. Remounts per active cell like the Briefing. Sections:
      styled distinctly), Arena placement tag `1ST OF 8` …, duration, time
    - Per-operator table: `Operator | Champion | KDA | Damage | Gold`, rows
      ordered TOP -> JUNGLE -> MID -> BOT -> SUPPORT on Summoner's Rift (from
-     `teamPosition`), otherwise by operator WR order; `12.3k` number format
+     `teamPosition`), otherwise by operator WR order; `12.3k` number format.
+     Phones (<= 560px) hide the Champion column and show the champion under
+     the operator's name, and tighten KDA to `12/3/8`, so all stats fit
    - Viewing operator marked with `YOU` suffix — by `user_id` (the
      `/operations` payload carries it), name as fallback
    - Card tinted: light green for wins, light red for losses
@@ -1023,7 +1087,8 @@ LEGION/
 │       │   └── mockData.js                <- dev-only NIGHT SHIFT cell fixtures (dynamically imported, never in prod)
 │       ├── hooks/
 │       │   ├── useAuth.jsx                <- auth context: session, cells, link, reset (DEV_MOCK fakes a session in dev)
-│       │   └── useClipboard.js            <- copy + "COPIED" confirmation
+│       │   ├── useClipboard.js            <- copy + "COPIED" confirmation
+│       │   └── useMediaQuery.js           <- live media-query boolean + PHONE_QUERY (charts' phone geometry)
 │       ├── components/
 │       │   ├── Header.jsx                 <- site nav, cell switcher with per-cell manage panel (remove operator / dissolve cell)
 │       │   ├── PageHeader.jsx             <- sticky page header + Sync Intel + result line (Briefing, OpLog)
@@ -1165,4 +1230,5 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-08-19 | Audit remediation Phases 1-3 shipped (commit `e1e468a`, deployed to production; DB migration `phase1_security_hardening` applied live). Phase 1: RLS reduced to a six-policy read/delete-only model (all writes server-side via service role), anon grants revoked, `join_cell_by_invite_code` RPC dropped, `created_by` ON DELETE SET NULL, service-key fail-fast, validate-riot-id per-IP throttle + result cache, crypto.randomInt invite codes + join throttle. Phase 2: Arena subteam grouping, remake exclusion, real season filter + pagination past the 1000-row cap, null WR for zero-game members, first test suite (`stats.test.js`, 12 tests, `npm test`), node-fetch dropped, Node >= 20. Phase 3: race-guarded fetches + per-cell state reset, dossier-toned error/retry states, Riot-link short-circuit + failure banner, full password-reset flow, keyboard-operable Intake radios + `NIGHT SHIFT` placeholder (ZOO lore violation cleared) |
 | 2026-08-20 | Audit remediation Phase 4 — accessibility, WCAG 2.1 AA pass (commit `9194eb2`): per-route titles + `<main>` + real heading tree; ConfirmModal dialog semantics, focus trap and restore; keyboard-reachable manage toggle (real sibling button, aria-expanded, Escape); Link Analysis nodes focusable and touch-operable, role/summary, dark text tiers, 7 -> 10 node cap; Campaign Record barcode wins-up/losses-down + tap crosshair; heatmap role=img + computed summary + visible PEAK caption; pool-bar sr-only summaries; `--muted-light` retired from text; profile badges re-tinted; redaction helpers aria-hidden + sr-only "[redacted]"; OpLog chips aria-pressed + role=group; tables th scope=col in `.table-scroll`; reduced-motion extended; 320/375 px reflow; Landing REPORT-01 and About glossary Tilt -> Campaign Record |
 | 2026-08-21 | Button-up pass (code, presentation, GitHub). Harvested four uncommitted worktrees (docs re-sync, Tilt copy purge in README + mockups, dead `.tilt-*`/matrix CSS). Server: season window falls back to last year's boundary Jan 1-9 (`services/season.js`, tested); ingest existence check chunked (PostgREST 1000-row cap) + 45 s time budget + auto-link error check; keyset pagination on `match_id`; Riot fetch 8 s timeout, bounded cache, match payloads uncached; `adjacent_cells` cross-cell disclosure removed from `/stats`; `/operations` uses `getSameTeamCellGroup` and emits `user_id`; shared `middleware/auth.js` (503 on Auth outage); UUID param guards, body-absent guards, Riot ID shape checks, cache bound; JSON 404 + error middleware, `x-powered-by` off, 16 kB body limit; `tilt_index` dropped from the payload; dead code removed; 20 new tests (32 total). Client: Briefing/OpLog remount per cell (fixes the sync-after-switch race and the new react-hooks lint); shared PageHeader / FetchFault / Redacted / ErrorBoundary / modes; `return_to` same-origin resolution (backslash bypass); 401 re-auth clears the session first; canonical Riot ID at sign-up; YOU by `user_id` everywhere; OpLog chip sort bug (`op.result`) fixed; sync banner covers every ingest status; empty-filter notice; Campaign Record gap cap; ConfirmModal error/busy states replace `alert()`; copy-to-clipboard confirmation; Supabase Auth error copy map; PASSCODE labels; ZOO glossary trimmed to the ruling; About "by Riot ID" copy fixed; contrast fixes; Link Analysis `role=group`; mock data dynamically imported behind `import.meta.env.DEV` (out of prod); vendor chunks (entry 525 -> 97 kB); fonts via `<link>`; meta description + Open Graph/Twitter cards + 1200x630 OG card + apple-touch-icon; on-brand favicon; robots.txt + sitemap.xml; Vercel asset caching + security headers; 32 dead CSS selectors removed; Vite template leftovers deleted. Repo: deps updated (0 vulnerabilities), package metadata (`legion-client` / `legion-server`, private, Node >= 20), `.nvmrc`, `.editorconfig`, GitHub Actions CI, README rewritten (OG banner, CI badge, env table, deployment notes), CLAUDE.md re-synced, GitHub topics set |
+| 2026-09-27 | Mobile pass (full audit at 320-430px with headless Chromium, then fixes). Header: the bar wrapped to three rows (175px) at 375px and, with the sticky page header, pinned ~350px of an 812px screen; tablets (768-820px) scrolled sideways; the switcher dropdown ran off-screen. Now a 60px compact header <= 900px with a `#site-menu` disclosure panel, full-width switcher dropdown, `--header-h` synced to the real height, page header static on phones/landscape. Charts: Campaign Record draws at measured width on narrow panels; Link Analysis has a compact 340x326 canvas (both previously rendered labels at 4-7px). Tables: roster and match tables re-laid out to fit phones (no sideways scroll). Also: 16px inputs (iOS zoom), 2 x 2 stat cross rules, Game Mode rows (name / games / WR over a full-width bar), single-column assessment rules, pool badge groups and `+N` remainder, doc-stamp / glossary / intake-list stacking, full-width CTAs, overlay scrolling + one-line invite code, keyboard-safe confirm dialog, >= 40px tap targets, touch tooltip anchoring, hover effects gated to hover devices, `theme-color` -> header ink, "1 games" plural. Desktop verified pixel-identical by screenshot diff against the previous build (bar the new label halos in Link Analysis) |
 | 2026-09-27 | Legal pass, three commits: Riot Games legal boilerplate (verbatim) + `Privacy` / `Terms` links added below the classified line in the shared footer (`0fefe4c`); public `/privacy` page, 10 plain-English provisions on the About layout (`ff22a9b`); public `/terms` page, 8 provisions (`c87ee07`). Per-route titles `PRIVACY // LEGION` / `TERMS // LEGION`. The local-storage provision was worded to match what the client actually stores rather than "only to keep you signed in". Docs: Copy Tone exception 4 (legal copy), routes table, footer spec, page features, file tree, status; `sitemap.xml` extended to the five public routes |

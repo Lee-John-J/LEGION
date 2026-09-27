@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 /**
  * Campaign Record — season trend chart.
@@ -9,21 +9,43 @@ import { useMemo, useState } from 'react'
  * scales with the length of the silence (capped so a long break can't
  * dominate the chart). The strip under the axis is the raw record —
  * one tick per game, green win / red loss.
+ *
+ * Two canvases: the desktop chart is drawn on a fixed 680-unit canvas and
+ * scaled to its panel. A panel narrower than that (phones) is drawn at its
+ * measured width instead, 1 unit = 1px, so labels keep a readable size
+ * rather than shrinking with the whole canvas.
  */
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const DAY = 86400000
 const ROLL_WINDOW = 20
-const PLOT_LEFT = 46
-const PLOT_RIGHT = 670
+const DESKTOP_W = 680
 const Y = (v) => 16 + (100 - v) * 1.6
+
+// Horizontal geometry for a canvas W units wide. The vertical geometry
+// (Y, the barcode at 186, month labels at 216) is shared by both canvases.
+function geometry(W) {
+  const compact = W < DESKTOP_W
+  return {
+    W,
+    compact,
+    left: compact ? 34 : 46,
+    right: compact ? W - 6 : 670,
+    font: compact ? 10.5 : 9,
+    // Narrowest month span that still gets a label
+    minMonthSpan: compact ? 26 : 18,
+    // Streak labels are clamped inside this band so they never clip
+    labelMin: compact ? 64 : 80,
+    labelMax: compact ? W - 30 : 600,
+  }
+}
 
 function fmtDate(ts) {
   const d = new Date(ts)
   return `${MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`
 }
 
-function buildCampaign(timeline) {
+function buildCampaign(timeline, g) {
   if (!timeline || timeline.length < 2) return null
   const games = [...timeline].sort((a, b) => a.ts - b.ts)
   const n = games.length
@@ -44,7 +66,9 @@ function buildCampaign(timeline) {
   for (let i = 1; i < n; i++) {
     const idleDays = (games[i].ts - games[i - 1].ts) / DAY
     if (idleDays >= 7) {
-      const w = Math.min(30, 6 + Math.floor(idleDays / 7) * 8)
+      // Band widths are specified on the desktop canvas; a narrower canvas
+      // scales them down with its plot
+      const w = Math.min(30, 6 + Math.floor(idleDays / 7) * 8) * (g.compact ? (g.right - g.left) / 624 : 1)
       gapAt[i] = w
       totalGap += w
     }
@@ -53,7 +77,7 @@ function buildCampaign(timeline) {
   // Dark periods may claim at most 35% of the plot. A sparse cell that plays
   // one session every other week would otherwise accumulate more band width
   // than the axis has, driving the per-game step negative.
-  const plotWidth = PLOT_RIGHT - PLOT_LEFT
+  const plotWidth = g.right - g.left
   const maxGap = plotWidth * 0.35
   if (totalGap > maxGap) {
     const scale = maxGap / totalGap
@@ -66,7 +90,7 @@ function buildCampaign(timeline) {
   let offset = 0
   for (let i = 0; i < n; i++) {
     if (gapAt[i]) offset += gapAt[i]
-    xs.push(PLOT_LEFT + i * step + offset)
+    xs.push(g.left + i * step + offset)
   }
 
   // Month boundaries + labels (labels skipped when the span is too narrow)
@@ -83,7 +107,7 @@ function buildCampaign(timeline) {
   for (let i = 1; i <= n; i++) {
     if (i === n || monthOf[i] !== monthOf[spanStart]) {
       const x0 = xs[spanStart], x1 = xs[i - 1]
-      if (x1 - x0 >= 18) {
+      if (x1 - x0 >= g.minMonthSpan) {
         monthLabels.push({ x: (x0 + x1) / 2, label: MONTHS[new Date(games[spanStart].ts).getMonth()] })
       }
       spanStart = i
@@ -133,14 +157,14 @@ function buildCampaign(timeline) {
   }
 }
 
-function Annotation({ x, y, color, label }) {
+function Annotation({ x, y, color, label, g }) {
   const above = y > 106
   return (
     <>
       <circle cx={x} cy={y} r={5} fill="none" stroke={color} strokeWidth={1.5} />
       <text
-        x={Math.max(80, Math.min(600, x))} y={above ? y - 12 : y + 18}
-        textAnchor="middle" fontSize={9} letterSpacing={1} fill={color}
+        x={Math.max(g.labelMin, Math.min(g.labelMax, x))} y={above ? y - 12 : y + 18}
+        textAnchor="middle" fontSize={g.font} letterSpacing={1} fill={color}
         stroke="var(--card)" strokeWidth={3.5} paintOrder="stroke"
         fontFamily="Courier Prime, monospace"
       >
@@ -152,7 +176,21 @@ function Annotation({ x, y, color, label }) {
 
 export default function CampaignRecord({ timeline }) {
   const [hover, setHover] = useState(null)
-  const data = useMemo(() => buildCampaign(timeline), [timeline])
+  // Measured panel width; below DESKTOP_W the chart is drawn at this width
+  const [measured, setMeasured] = useState(null)
+  const wrapRef = useRef(null)
+  const W = measured != null && measured < DESKTOP_W ? Math.max(240, Math.round(measured)) : DESKTOP_W
+  const g = useMemo(() => geometry(W), [W])
+  const data = useMemo(() => buildCampaign(timeline, g), [timeline, g])
+  const hasChart = data != null
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([entry]) => setMeasured(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hasChart])
 
   if (!data) {
     return (
@@ -168,7 +206,7 @@ export default function CampaignRecord({ timeline }) {
 
   function handleMove(e) {
     const rect = e.currentTarget.getBoundingClientRect()
-    const mx = (e.clientX - rect.left) * (680 / rect.width)
+    const mx = (e.clientX - rect.left) * (W / rect.width)
     let nearest = 0, bestDist = Infinity
     for (let i = 0; i < n; i++) {
       const d = Math.abs(xs[i] - mx)
@@ -183,9 +221,9 @@ export default function CampaignRecord({ timeline }) {
     : undefined
 
   return (
-    <div className="cr-wrap">
+    <div className="cr-wrap" ref={wrapRef}>
       <svg
-        className="cr-svg" viewBox="0 0 680 228" xmlns="http://www.w3.org/2000/svg"
+        className="cr-svg" viewBox={`0 0 ${W} 228`} xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-label={`Rolling 20-game win rate across the season, one step per joint deployment. Currently ${roll[n - 1]}% after ${n} games. Best run ${best.W.len} wins; worst slump ${best.L.len} losses.`}
         onMouseMove={handleMove} onClick={handleMove} onMouseLeave={() => setHover(null)}
@@ -211,12 +249,12 @@ export default function CampaignRecord({ timeline }) {
         {/* Y gridlines */}
         {[0, 25, 75, 100].map((v) => (
           <g key={`grid-${v}`}>
-            <line x1={44} y1={Y(v)} x2={670} y2={Y(v)} stroke="var(--border-light)" strokeWidth={1} />
-            <text x={40} y={Y(v) + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Courier Prime, monospace">{v}%</text>
+            <line x1={g.left - 2} y1={Y(v)} x2={g.right} y2={Y(v)} stroke="var(--border-light)" strokeWidth={1} />
+            <text x={g.left - 6} y={Y(v) + 3} textAnchor="end" fontSize={g.font} fill="var(--muted)" fontFamily="Courier Prime, monospace">{v}%</text>
           </g>
         ))}
-        <line x1={44} y1={Y(50)} x2={670} y2={Y(50)} stroke="var(--slate-2)" strokeWidth={1} strokeDasharray="4 4" />
-        <text x={40} y={Y(50) + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Courier Prime, monospace">50%</text>
+        <line x1={g.left - 2} y1={Y(50)} x2={g.right} y2={Y(50)} stroke="var(--slate-2)" strokeWidth={1} strokeDasharray="4 4" />
+        <text x={g.left - 6} y={Y(50) + 3} textAnchor="end" fontSize={g.font} fill="var(--muted)" fontFamily="Courier Prime, monospace">50%</text>
 
         {/* Month boundaries + labels */}
         {monthBounds.map((bx, i) => (
@@ -224,8 +262,8 @@ export default function CampaignRecord({ timeline }) {
         ))}
         {monthLabels.map((m, i) => (
           <text
-            key={`ml-${i}`} x={m.x} y={216} textAnchor="middle" fontSize={9}
-            letterSpacing={2} fill="var(--muted)" fontFamily="Courier Prime, monospace"
+            key={`ml-${i}`} x={m.x} y={216} textAnchor="middle" fontSize={g.font}
+            letterSpacing={g.compact ? 1.5 : 2} fill="var(--muted)" fontFamily="Courier Prime, monospace"
           >
             {m.label}
           </text>
@@ -233,16 +271,16 @@ export default function CampaignRecord({ timeline }) {
 
         {/* Trend line + win/loss strip (wins above the baseline, losses below) */}
         <path d={data.linePath} fill="none" stroke="var(--text)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        <line x1={PLOT_LEFT - 2} y1={186} x2={PLOT_RIGHT} y2={186} stroke="var(--slate-2)" strokeWidth={0.75} />
+        <line x1={g.left - 2} y1={186} x2={g.right} y2={186} stroke="var(--slate-2)" strokeWidth={0.75} />
         <path d={data.winTicks} stroke="var(--green)" strokeWidth={2.2} fill="none" />
         <path d={data.lossTicks} stroke="var(--red)" strokeWidth={2.2} fill="none" />
 
         {/* Streak annotations */}
         {best.L.len >= 3 && (
-          <Annotation x={xs[best.L.end]} y={Y(roll[best.L.end])} color="var(--red)" label={`${best.L.len}L SLUMP`} />
+          <Annotation x={xs[best.L.end]} y={Y(roll[best.L.end])} color="var(--red)" label={`${best.L.len}L SLUMP`} g={g} />
         )}
         {best.W.len >= 3 && (
-          <Annotation x={xs[best.W.end]} y={Y(roll[best.W.end])} color="var(--green)" label={`${best.W.len}W RUN`} />
+          <Annotation x={xs[best.W.end]} y={Y(roll[best.W.end])} color="var(--green)" label={`${best.W.len}W RUN`} g={g} />
         )}
 
         {/* Hover crosshair */}
@@ -252,7 +290,7 @@ export default function CampaignRecord({ timeline }) {
       </svg>
 
       {hover != null && (
-        <div className="cr-tip" style={{ left: `${(hoverX / 680) * 100}%`, transform: tipAlign }}>
+        <div className="cr-tip" style={{ left: `${(hoverX / W) * 100}%`, transform: tipAlign }}>
           <strong>GAME {hover + 1} &mdash; {fmtDate(games[hover].ts)}</strong><br />
           {games[hover].win ? 'WIN' : 'LOSS'} &middot; ROLLING {roll[hover]}%
         </div>

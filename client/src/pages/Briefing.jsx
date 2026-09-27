@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { isMockCell } from '../lib/devMock'
 import { STAPLE_MODES, resolveMode } from '../lib/modes'
 import { useClipboard } from '../hooks/useClipboard'
+import { useMediaQuery, PHONE_QUERY } from '../hooks/useMediaQuery'
 import CellOverlay from '../components/CellOverlay'
 import CampaignRecord from '../components/CampaignRecord'
 import Footer from '../components/Footer'
@@ -103,7 +104,7 @@ function renderPoolBar(champs, totalGames, uniqueCount) {
     })}
     {hasRemainder && (
       <div className="pool-seg s-empty" aria-hidden="true" style={{ width: `${remainder}%` }}>
-        {hiddenCount > 0 ? `+${hiddenCount} more` : ''}
+        <span className="pool-seg-label">+{hiddenCount}<span className="pool-more-word"> more</span></span>
       </div>
     )}
   </>
@@ -136,7 +137,15 @@ function classifyBond(games, wrPct) {
   return { label: 'STRAINED', color: 'var(--red)' }
 }
 
-function buildLinkSVG(ops, duoStats) {
+// Type + pill sizes per canvas. The compact canvas is narrow enough to be
+// drawn near 1:1 on a phone, so its labels are set larger than the desktop
+// canvas's (which is scaled UP on desktop)
+const LINK_SIZES = {
+  desktop: { name: 10, ops: 8, pill: 9.5, pillW: 36, pillH: 16, hot: 15, hotW: 66, hotH: 34, sub: 8.5, inactive: 9 },
+  compact: { name: 12, ops: 10, pill: 11.5, pillW: 40, pillH: 18, hot: 17, hotW: 76, hotH: 40, sub: 10, inactive: 10.5 },
+}
+
+function buildLinkSVG(ops, duoStats, compact = false) {
   if (!ops || ops.length < 2) return null
 
   const ACTIVE_THRESHOLD = 5
@@ -194,14 +203,20 @@ function buildLinkSVG(ops, duoStats) {
 
   // ── Layout: ring on a fixed canvas — the SVG scales it to fit the panel.
   // r pushes close to the canvas edge; name labels are clamped inside, so
-  // the ring can claim margin space that used to sit empty ──
-  const cx = 200, cy = 175
-  const r = 125
+  // the ring can claim margin space that used to sit empty. Phones get a
+  // square compact canvas whose labels sit above/below each node (there is
+  // no room beside the side nodes) ──
+  const boxW = compact ? 340 : 400
+  const boxH = compact ? 326 : 370
+  const cx = compact ? 170 : 200
+  const cy = compact ? 163 : 175
+  const r = compact ? 112 : 125
+  const pairGap = compact ? 115 : 135
   let positions
   if (n === 1) {
     positions = [{ x: cx, y: cy }]
   } else if (n === 2) {
-    positions = [{ x: cx - 135, y: cy }, { x: cx + 135, y: cy }]
+    positions = [{ x: cx - pairGap, y: cy }, { x: cx + pairGap, y: cy }]
   } else {
     positions = active.slice(0, n).map((_, i) => {
       const angle = (2 * Math.PI * i) / n - Math.PI / 2
@@ -211,10 +226,12 @@ function buildLinkSVG(ops, duoStats) {
 
   const inactivePositions = inactive.map((_, i) => {
     const angle = (2 * Math.PI * i) / Math.max(inactive.length, 1) + Math.PI / 6
-    return { x: cx + (r + 45) * Math.cos(angle), y: cy + (r + 45) * Math.sin(angle) }
+    const orbit = r + (compact ? 30 : 45)
+    return { x: cx + orbit * Math.cos(angle), y: cy + orbit * Math.sin(angle) }
   })
 
-  return { active, inactive, positions, inactivePositions, edges, pairSummary, n, cx, cy, boxW: 400, boxH: 370 }
+  const sizes = compact ? LINK_SIZES.compact : LINK_SIZES.desktop
+  return { active, inactive, positions, inactivePositions, edges, pairSummary, n, cx, cy, boxW, boxH, compact, sizes }
 }
 
 function BriefingView() {
@@ -229,6 +246,7 @@ function BriefingView() {
   const [fetchError, setFetchError] = useState(null)
   // Index of the active operator being hovered in Link Analysis (null = none)
   const [hoverOp, setHoverOp] = useState(null)
+  const isPhone = useMediaQuery(PHONE_QUERY)
 
   const cellId = activeCell?.id
   const hasCell = !!(user && activeCell)
@@ -382,8 +400,10 @@ function BriefingView() {
   // Link analysis data
   const linkData = useMemo(() => {
     if (!hasData || !stats.operator_stats) return null
-    return buildLinkSVG(stats.operator_stats, stats.duo_stats)
-  }, [hasData, stats])
+    return buildLinkSVG(stats.operator_stats, stats.duo_stats, isPhone)
+  }, [hasData, stats, isPhone])
+
+  const sz = linkData?.sizes ?? LINK_SIZES.desktop
 
   // Find current user's wr_without from operator_stats
   // This is the cell's joint WR in matches where THIS user was absent
@@ -580,11 +600,13 @@ function BriefingView() {
           <table className="cm-table">
             <thead>
               <tr>
+                {/* Phones drop the STATUS column (the dot moves next to the
+                    name) and switch to the short labels */}
                 <th scope="col">OPERATOR</th>
-                <th scope="col">STATUS</th>
-                <th scope="col">GAMES (SEASON)</th>
-                <th scope="col">WIN RATE</th>
-                <th scope="col">CELL WR WITHOUT &mdash;</th>
+                <th scope="col" className="cm-col-status">STATUS</th>
+                <th scope="col"><span className="th-long">GAMES (SEASON)</span><span className="th-short">OPS</span></th>
+                <th scope="col"><span className="th-long">WIN RATE</span><span className="th-short">WR</span></th>
+                <th scope="col"><span className="th-long">CELL WR WITHOUT &mdash;</span><span className="th-short">W/O</span></th>
               </tr>
             </thead>
             <tbody>
@@ -596,11 +618,18 @@ function BriefingView() {
                     <tr key={op.puuid} className={isYou ? 'cm-you' : ''}>
                       <td>
                         <div className="cm-name">
-                          {op.name}
+                          {/* Dot + name never split across lines on phones */}
+                          <span className="cm-name-text">
+                            <span className="cm-status-inline">
+                              <span className={`status-dot ${isActive ? 'status-active' : 'status-inactive'}`} />
+                              <span className="sr-only">{isActive ? 'Active' : 'Inactive'}</span>
+                            </span>
+                            {op.name}
+                          </span>
                           {isYou && <span className="cm-you-tag">YOU</span>}
                         </div>
                       </td>
-                      <td>
+                      <td className="cm-col-status">
                         <span className="cm-status">
                           <span className={`status-dot ${isActive ? 'status-active' : 'status-inactive'}`} />
                           {isActive ? 'Active' : 'Inactive'}
@@ -637,7 +666,7 @@ function BriefingView() {
                 [140, 120, 100, 110, 90].map((w, i) => (
                   <tr key={i}>
                     <td><R w={w} h={14} /></td>
-                    <td><R w={55} h={14} /></td>
+                    <td className="cm-col-status"><R w={55} h={14} /></td>
                     <td><R w={30} h={14} /></td>
                     <td><R w={50} h={14} /></td>
                     <td><R w={50} h={14} /></td>
@@ -750,7 +779,9 @@ function BriefingView() {
           {/* Link Analysis — pair network graph */}
           <div className="card vis-panel">
             <h2 className="panel-title">Link Analysis</h2>
-            <div className="panel-subtitle">Joint win rate by operator pair. Hover an operator to isolate their links.</div>
+            <div className="panel-subtitle">
+              Joint win rate by operator pair. <span className="copy-hover">Hover</span><span className="copy-touch">Tap</span> an operator to isolate their links.
+            </div>
             <div className="panel-body">
               <div className="link-svg-wrap">
                 {linkData ? (
@@ -787,26 +818,27 @@ function BriefingView() {
                           {!e.noData && (
                             <>
                               <rect
-                                x={midX - (isHot ? 33 : 18)} y={midY - (isHot ? 17 : 9)}
-                                width={isHot ? 66 : 36} height={isHot ? 34 : 16} rx={2}
+                                x={midX - (isHot ? sz.hotW : sz.pillW) / 2} y={midY - (isHot ? sz.hotH / 2 : sz.pillH / 2 + 1)}
+                                width={isHot ? sz.hotW : sz.pillW} height={isHot ? sz.hotH : sz.pillH} rx={2}
                                 fill="var(--card)" stroke={e.stroke}
                                 strokeWidth={isHot ? 1 : 0.75} opacity={0.95} />
-                              <text x={midX} y={midY + (isHot ? -3 : 3)} textAnchor="middle"
+                              <text x={midX} y={midY + (isHot ? -3 : sz.pill * 0.32)} textAnchor="middle"
                                 fontFamily="Courier Prime, monospace"
-                                fontSize={isHot ? 15 : 9.5}
+                                fontSize={isHot ? sz.hot : sz.pill}
                                 fontWeight="700" fill={e.textColor}>
                                 {e.wr}%
                               </text>
                               {isHot && (
                                 <>
-                                  <text x={midX} y={midY + 11} textAnchor="middle"
-                                    fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
+                                  <text x={midX} y={midY + sz.sub + 2.5} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize={sz.sub} fontWeight="600"
                                     letterSpacing="1" fill="var(--muted)">
                                     {e.games} OPS
                                   </text>
-                                  <text x={midX} y={midY + 31} textAnchor="middle"
-                                    fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
-                                    letterSpacing="1.5" fill={e.bond.color}>
+                                  <text x={midX} y={midY + sz.hotH / 2 + sz.sub + 5.5} textAnchor="middle"
+                                    fontFamily="IBM Plex Mono, monospace" fontSize={sz.sub} fontWeight="600"
+                                    letterSpacing="1.5" fill={e.bond.color}
+                                    stroke="var(--card)" strokeWidth={3} paintOrder="stroke">
                                     {e.bond.label}
                                   </text>
                                 </>
@@ -815,7 +847,7 @@ function BriefingView() {
                           )}
                           {e.noData && isHot && (
                             <text x={midX} y={midY + 4} textAnchor="middle"
-                              fontFamily="IBM Plex Mono, monospace" fontSize="8.5" fontWeight="600"
+                              fontFamily="IBM Plex Mono, monospace" fontSize={sz.sub} fontWeight="600"
                               letterSpacing="1" fill="var(--muted)" opacity={0.8}>
                               UNLINKED
                             </text>
@@ -830,17 +862,27 @@ function BriefingView() {
                       if (!p) return null
                       // Push label outward from center so it never overlaps edges
                       const angle = Math.atan2(p.y - linkData.cy, p.x - linkData.cx)
-                      const labelDist = 26
-                      const rawLx = p.x + labelDist * Math.cos(angle)
-                      const ly = p.y + labelDist * Math.sin(angle)
                       const dx = p.x - linkData.cx
-                      const anchor = dx > 15 ? 'start' : dx < -15 ? 'end' : 'middle'
-                      // Clamp so long names never run off the canvas
-                      const lx = anchor === 'start' ? Math.min(rawLx, linkData.boxW - 78)
-                        : anchor === 'end' ? Math.max(rawLx, 78)
-                        : Math.min(Math.max(rawLx, 42), linkData.boxW - 42)
-                      // For top-center nodes, nudge label upward; for bottom, downward
-                      const vertNudge = Math.abs(dx) <= 15 ? (p.y < linkData.cy ? -6 : 6) : 0
+                      let lx, ly, anchor
+                      if (linkData.compact) {
+                        // Compact canvas: centred over the node, above it in the
+                        // top half and below it otherwise, clamped to the canvas
+                        const half = (op.name.length * (sz.name * 0.6 + 1.2)) / 2
+                        anchor = 'middle'
+                        lx = Math.min(Math.max(p.x, half + 2), linkData.boxW - half - 2)
+                        ly = p.y < linkData.cy - 5 ? p.y - 16 - sz.ops : p.y + 14 + sz.name
+                      } else {
+                        const labelDist = 26
+                        const rawLx = p.x + labelDist * Math.cos(angle)
+                        anchor = dx > 15 ? 'start' : dx < -15 ? 'end' : 'middle'
+                        // Clamp so long names never run off the canvas
+                        lx = anchor === 'start' ? Math.min(rawLx, linkData.boxW - 78)
+                          : anchor === 'end' ? Math.max(rawLx, 78)
+                          : Math.min(Math.max(rawLx, 42), linkData.boxW - 42)
+                        // For top-center nodes, nudge label upward; for bottom, downward
+                        const vertNudge = Math.abs(dx) <= 15 ? (p.y < linkData.cy ? -6 : 6) : 0
+                        ly = p.y + labelDist * Math.sin(angle) + vertNudge
+                      }
                       const nodeDim = hoverOp !== null && hoverOp !== i
                       return (
                         <g key={op.puuid || i} className="link-el" opacity={nodeDim ? 0.5 : 1}
@@ -872,14 +914,17 @@ function BriefingView() {
                           {/* Center dot */}
                           <circle cx={p.x} cy={p.y} r={2.5} fill="var(--text)" />
                           {/* Operator name — pushed outward from center */}
-                          <text x={lx} y={ly + vertNudge} textAnchor={anchor}
-                            fontFamily="IBM Plex Mono, monospace" fontSize="10" fontWeight="600"
-                            letterSpacing="1.2" fill="var(--text)">
+                          {/* Paper halo keeps labels legible where they cross an edge */}
+                          <text x={lx} y={ly} textAnchor={anchor}
+                            fontFamily="IBM Plex Mono, monospace" fontSize={sz.name} fontWeight="600"
+                            letterSpacing="1.2" fill="var(--text)"
+                            stroke="var(--card)" strokeWidth={3} paintOrder="stroke">
                             {op.name.toUpperCase()}
                           </text>
-                          <text x={lx} y={ly + vertNudge + 12} textAnchor={anchor}
-                            fontFamily="IBM Plex Mono, monospace" fontSize="8" fontWeight="400"
-                            fill="var(--muted)">
+                          <text x={lx} y={ly + sz.ops + 4} textAnchor={anchor}
+                            fontFamily="IBM Plex Mono, monospace" fontSize={sz.ops} fontWeight="400"
+                            fill="var(--muted)"
+                            stroke="var(--card)" strokeWidth={3} paintOrder="stroke">
                             {op.games} OPS
                           </text>
                         </g>
@@ -896,7 +941,7 @@ function BriefingView() {
                           <line x1={p.x - 5} y1={p.y} x2={p.x + 5} y2={p.y} stroke="var(--muted)" strokeWidth={0.5} />
                           <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 5} stroke="var(--muted)" strokeWidth={0.5} />
                           <text x={p.x} y={p.y + 14} textAnchor="middle"
-                            fontFamily="IBM Plex Mono, monospace" fontSize="9" fontWeight="600"
+                            fontFamily="IBM Plex Mono, monospace" fontSize={sz.inactive} fontWeight="600"
                             letterSpacing="1" fill="var(--muted)">
                             {op.name.toUpperCase()}
                           </text>
@@ -940,7 +985,7 @@ function BriefingView() {
                             <div
                               key={`${di}-${hour}`}
                               className={`heatmap-cell ${heatClass(count, heatmapData.max)}`}
-                              data-tooltip={`${day} ${t}: ${count} games`}
+                              data-tooltip={`${day} ${t}: ${count} game${count === 1 ? '' : 's'}`}
                             />
                           )
                         }),
@@ -1116,10 +1161,13 @@ function BriefingView() {
                             <div className="pool-theater-header">
                               <span className="pool-theater-label">{theater}</span>
                               <span className="pool-theater-games">{tGames} OPS</span>
-                              {showProfileBadge && (
-                                <span className={`pool-theater-badge badge badge-profile tag-${srProfileTag.category}`}>{srProfileTag.label}</span>
-                              )}
-                              <span className={`pool-theater-badge badge ${tBadge}`}>{tLabel}</span>
+                              {/* One group so the pair wraps together, never split */}
+                              <span className="pool-theater-badges">
+                                {showProfileBadge && (
+                                  <span className={`pool-theater-badge badge badge-profile tag-${srProfileTag.category}`}>{srProfileTag.label}</span>
+                                )}
+                                <span className={`pool-theater-badge badge ${tBadge}`}>{tLabel}</span>
+                              </span>
                             </div>
                             <div className="pool-bar pool-bar-sm">
                               {renderPoolBar(tChamps, tGames, td.unique_champions)}
@@ -1187,10 +1235,14 @@ function BriefingView() {
                       >
                         <div className="assessment-head">
                           <span className="assessment-code">
-                            {a.code} &middot;{' '}
-                            {isRedacted
-                              ? <span className="redacted-inline" style={{ height: 11, width: 88 }} />
-                              : (a.title?.toUpperCase() || 'ASSESSMENT')}
+                            {a.code}
+                            {/* Repeats the tag badge — phones hide it */}
+                            <span className="assessment-code-title">
+                              {' '}&middot;{' '}
+                              {isRedacted
+                                ? <span className="redacted-inline" style={{ height: 11, width: 88 }} />
+                                : (a.title?.toUpperCase() || 'ASSESSMENT')}
+                            </span>
                           </span>
                           {isRedacted ? (
                             <span
@@ -1249,7 +1301,10 @@ function BriefingView() {
                     <div key={i} className={`assessment-item severity-${a.severity} assessment-redacted`}>
                       <div className="assessment-head">
                         <span className="assessment-code">
-                          {a.code} &middot; <span className="redacted-inline" style={{ height: 11, width: 88 }} />
+                          {a.code}
+                          <span className="assessment-code-title">
+                            {' '}&middot; <span className="redacted-inline" style={{ height: 11, width: 88 }} />
+                          </span>
                         </span>
                         <span className="assessment-tag badge" style={{ background: 'var(--text)', color: 'var(--bg)' }}>
                           CLASSIFIED

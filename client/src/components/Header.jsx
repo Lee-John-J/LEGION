@@ -4,6 +4,12 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import ConfirmModal from './ConfirmModal'
 
+const NAV_LINKS = [
+  { to: '/briefing', label: 'Briefing' },
+  { to: '/oplog', label: 'Operation Log' },
+  { to: '/about', label: 'About' },
+]
+
 export default function Header() {
   const { user, logout, cells, activeCell, setActiveCell, refreshCells } = useAuth()
   const navigate = useNavigate()
@@ -19,7 +25,12 @@ export default function Header() {
   // to the focus trap. actionBusy blocks double-submits while a call is out.
   const [actionError, setActionError] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
+  // Compact header (phones, tablets): nav + account live in a disclosure
+  // panel behind the menu toggle instead of wrapping the bar onto 3 rows
+  const [menuOpen, setMenuOpen] = useState(false)
   const dropdownRef = useRef(null)
+  const menuBtnRef = useRef(null)
+  const menuPanelRef = useRef(null)
 
   const isAuthPage = location.pathname === '/authenticate'
 
@@ -29,11 +40,17 @@ export default function Header() {
         setDropdownOpen(false)
         setManagingCellId(null)
       }
+      if (!menuBtnRef.current?.contains(e.target) && !menuPanelRef.current?.contains(e.target)) {
+        setMenuOpen(false)
+      }
     }
     function handleEscape(e) {
       if (e.key === 'Escape') {
         setDropdownOpen(false)
         setManagingCellId(null)
+        // Closing the menu from inside it hands focus back to its toggle
+        if (menuPanelRef.current?.contains(document.activeElement)) menuBtnRef.current?.focus()
+        setMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -129,9 +146,6 @@ export default function Header() {
   const riotName = user?.user_metadata?.riot_game_name
   const riotTag = user?.user_metadata?.riot_tag_line
 
-  const briefingLink = '/briefing'
-  const oplogLink = '/oplog'
-
   return (
     <>
     <header className="site-header">
@@ -150,16 +164,20 @@ export default function Header() {
             tabIndex={user ? 0 : -1}
             aria-haspopup="true"
             aria-expanded={dropdownOpen}
-            onClick={() => user && setDropdownOpen(!dropdownOpen)}
+            onClick={() => {
+              if (!user) return
+              setDropdownOpen(!dropdownOpen)
+              setMenuOpen(false)
+            }}
           >
             {user && activeCell ? (
               <>
-                <span>{activeCell.name}</span>
+                <span className="cs-trigger-name">{activeCell.name}</span>
                 <span className="chev">&#9662;</span>
               </>
             ) : user ? (
               <>
-                <span style={{ opacity: 0.5 }}>NO ACTIVE CELL</span>
+                <span className="cs-trigger-name" style={{ opacity: 0.5 }}>NO ACTIVE CELL</span>
                 <span className="chev">&#9662;</span>
               </>
             ) : (
@@ -274,10 +292,8 @@ export default function Header() {
           </div>
         </div>
 
-        <nav>
-          <NavLink to={briefingLink}>Briefing</NavLink>
-          <NavLink to={oplogLink}>Operation Log</NavLink>
-          <NavLink to="/about">About</NavLink>
+        <nav className="header-nav" aria-label="Primary">
+          {NAV_LINKS.map(({ to, label }) => <NavLink key={to} to={to}>{label}</NavLink>)}
         </nav>
       </div>
 
@@ -296,9 +312,55 @@ export default function Header() {
             <Link to="/authenticate" className="header-cta">Authenticate</Link>
           )
         )}
+        {/* Compact-header toggle (CSS shows it on narrow screens only) */}
+        <button
+          type="button"
+          className={`menu-toggle${menuOpen ? ' open' : ''}`}
+          ref={menuBtnRef}
+          aria-expanded={menuOpen}
+          aria-controls="site-menu"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          onClick={() => {
+            setMenuOpen(!menuOpen)
+            setDropdownOpen(false)
+            setManagingCellId(null)
+          }}
+        >
+          <span className="menu-toggle-bars" aria-hidden="true"><span /><span /><span /></span>
+        </button>
       </div>
 
+      {/* Compact-header disclosure panel. Any link or button inside it
+          closes it, so a route change never leaves it hanging open. */}
+      <div
+        id="site-menu"
+        className="mobile-menu"
+        ref={menuPanelRef}
+        hidden={!menuOpen}
+        onClick={(e) => { if (e.target.closest('a, button')) setMenuOpen(false) }}
+      >
+        <nav aria-label="Primary">
+          {NAV_LINKS.map(({ to, label }, i) => (
+            <NavLink key={to} to={to}>
+              <span className="mm-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        {user && (
+          <div className="mm-account">
+            {riotName && (
+              <div className="mm-operator">
+                <span className="mm-label">OPERATOR ON FILE</span>
+                <strong>{riotName}</strong> #{riotTag}
+              </div>
+            )}
+            <button className="logout-btn" onClick={handleLogout}>Disengage</button>
+          </div>
+        )}
+      </div>
     </header>
+    {menuOpen && <div className="mobile-menu-backdrop" aria-hidden="true" />}
 
     {dissolveTarget && (
       <ConfirmModal

@@ -43,19 +43,29 @@ export default function PageHeader({ eyebrow, hasCell, activeCell, syncing, sync
           <h1 className="title-hero page-title">
             {hasCell ? activeCell.name : <R w={180} h={28} />}
           </h1>
+          {/* Each fact is a no-wrap unit carrying its own leading divider, so
+              a narrow screen breaks the line between facts, never inside one */}
           <div className="page-meta">
-            <strong>{hasCell ? memberCount : <R w={16} />}</strong>
-            {' '}operator{memberCount !== 1 ? 's' : ''}
-            <span className="meta-divider">//</span>
-            region <strong>{hasCell ? 'NA' : <R w={24} />}</strong>
-            <span className="meta-divider">//</span>
-            established <strong>{hasCell && activeCell.created_at
-              ? new Date(activeCell.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-              : <R w={90} />}</strong>
-            <span className="meta-divider">//</span>
-            case <strong>LGN-<R w={36} /></strong>
+            <span className="meta-item">
+              <strong>{hasCell ? memberCount : <R w={16} />}</strong>
+              {' '}operator{memberCount !== 1 ? 's' : ''}
+            </span>
+            <span className="meta-item">
+              <span className="meta-divider">//</span>
+              region <strong>{hasCell ? 'NA' : <R w={24} />}</strong>
+            </span>
+            <span className="meta-item">
+              <span className="meta-divider">//</span>
+              established <strong>{hasCell && activeCell.created_at
+                ? new Date(activeCell.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                : <R w={90} />}</strong>
+            </span>
+            <span className="meta-item">
+              <span className="meta-divider">//</span>
+              case <strong>LGN-<R w={36} /></strong>
+            </span>
             {hasCell && (
-              <>
+              <span className="meta-item meta-sync">
                 <span className="meta-divider">//</span>
                 <button
                   className="recruit-btn"
@@ -64,7 +74,7 @@ export default function PageHeader({ eyebrow, hasCell, activeCell, syncing, sync
                 >
                   {syncing ? 'SYNCING...' : '+ Sync Intel'}
                 </button>
-              </>
+              </span>
             )}
           </div>
           {syncResult && (
