@@ -10,6 +10,8 @@ import Authenticate from './pages/Authenticate'
 import Intake from './pages/Intake'
 import Briefing from './pages/Briefing'
 import OperationLog from './pages/OperationLog'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 // Per-route document titles so tabs and screen readers can tell pages apart
 const TITLES = {
@@ -19,6 +21,8 @@ const TITLES = {
   '/intake': 'INTAKE // LEGION',
   '/briefing': 'BRIEFING // LEGION',
   '/oplog': 'OPERATION LOG // LEGION',
+  '/privacy': 'PRIVACY // LEGION',
+  '/terms': 'TERMS // LEGION',
 }
 
 function TitleSync() {
@@ -43,6 +47,8 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/about" element={<About />} />
               <Route path="/authenticate" element={<Authenticate />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/intake" element={
                 <ProtectedRoute><Intake /></ProtectedRoute>
               } />
