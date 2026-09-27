@@ -1,7 +1,7 @@
 # LEGION — Project Intelligence Brief
 **CLASSIFICATION: INTERNAL USE ONLY**
 **DOCUMENT TYPE: DEVELOPMENT DIRECTIVE**
-**LAST UPDATED: 2026-08-21**
+**LAST UPDATED: 2026-09-27**
 
 ---
 
@@ -237,6 +237,12 @@ Write all UI copy as if authored by a Cold War intelligence analyst.
    figure. Sanctioned while no real match volume exists. At public launch,
    Matches Filed switches to the real figure per the Landing spec below.
 3. **About glossary ZOO entry** is partially redacted by design — see LORE: ZOO.
+4. **Legal copy** (on record 2026-09-27): the `/privacy` and `/terms`
+   provision bodies are plain English — they are real legal documents, not
+   lore. Only their chrome (doc-stamp, eyebrows, headings, footer) carries
+   the dossier voice, and nothing in the provision text is redacted. The
+   footer's Riot Games legal line is reproduced verbatim: never redact,
+   abbreviate, uppercase, or restyle it.
 
 ---
 
@@ -415,6 +421,8 @@ production builds — verified by grepping `dist/` after `vite build`.
 | `/` | `Landing.jsx` | No | Public marketing page: hero, stats strip, feature cards |
 | `/about` | `About.jsx` | No | Public info: intake procedure, glossary, ZOO lore |
 | `/authenticate` | `Authenticate.jsx` | No | Sign-in / New Operator tabs |
+| `/privacy` | `Privacy.jsx` | No | Privacy policy (plain-English legal document) |
+| `/terms` | `Terms.jsx` | No | Terms of service (plain-English legal document) |
 | `/intake` | `Intake.jsx` | Yes | Cell creation (new case) or join (invite code) |
 | `/briefing` | `Briefing.jsx` | Yes | Cell dashboard — ALL stats live here |
 | `/oplog` | `OperationLog.jsx` | Yes | Joint match history with filters |
@@ -427,8 +435,8 @@ production builds — verified by grepping `dist/` after `vite build`.
 etc. via `TitleSync`), a `<main>` landmark, and an `ErrorBoundary` around the
 routes so a render fault shows a `RETRIEVAL FAULT` card (with RELOAD) under a
 still-usable header instead of a blank page. `robots.txt` disallows
-`/briefing`, `/oplog`, `/intake`, `/api/`; `sitemap.xml` lists the three
-public routes.
+`/briefing`, `/oplog`, `/intake`, `/api/`; `sitemap.xml` lists the five
+public routes (`/`, `/about`, `/authenticate`, `/privacy`, `/terms`).
 
 ---
 
@@ -480,7 +488,18 @@ Every page: `DOCUMENT REF: LGN-2026-<CODE>███ // ORIGINATING OFFICE: <offi
 Per page: Landing `LGN-2026-███` / LEGION/OPS; Briefing `BRIEF-`; OpLog
 `OPLOG-`; Intake `INTAKE-` / LEGION/INTAKE with tail `DECLASSIFY ON: CASE
 CLOSURE`; Authenticate `AUTH-` / LEGION/AUTH; About `ABOUT-` / LEGION/ANALYSIS
-with tail `CLEARED FOR EXTERNAL DISTRIBUTION`.
+with tail `CLEARED FOR EXTERNAL DISTRIBUTION`; Privacy `PRIV-` and Terms
+`TERMS-` / LEGION/COUNSEL, same tail as About.
+
+Below that line, on every page (`.footer-legal`, `.footer-legal-links`:
+`--font-mono`, 11px, `--muted`, sentence case, no tracking):
+1. Riot Games legal boilerplate, verbatim (see Copy Tone exception 4):
+   "LEGION is not endorsed by Riot Games and does not reflect the views or
+   opinions of Riot Games or anyone officially involved in producing or
+   managing Riot Games properties. Riot Games and all associated properties
+   are trademarks or registered trademarks of Riot Games, Inc."
+2. `Privacy` -> `/privacy` and `Terms` -> `/terms` links (underlined,
+   `<nav aria-label="Legal">`)
 
 ---
 
@@ -515,6 +534,33 @@ with tail `CLEARED FOR EXTERNAL DISTRIBUTION`.
    (mention #2) is `████. Parent agency. ████.` per LORE: ZOO
 4. **CTA section** — `Open New File` + `Return to Home` buttons
 5. Footer
+
+### Privacy (`/privacy`) and Terms (`/terms`)
+Public legal pages on the About layout: doc-stamp hero (`LGN-PRIV-001` /
+`LGN-TERMS-001`, `PUBLIC RELEASE`), then a `• PROVISIONS` section of numbered
+provisions in the `.intake-list` card (`.legal-body` adds the underlined
+in-text mailto links and the closing gap, since there is no CTA band), then
+the footer. Dossier voice in the chrome only; provision bodies are plain
+English (Copy Tone exception 4). Contact `contact@legion.report`; both
+effective September 26, 2026.
+- **Privacy** — eyebrow `PRIVACY DIRECTIVE`, H1 `Privacy Policy`, 10
+  provisions in order: information on file (email + password via Supabase
+  Auth, Riot ID, PUUID, public match data), purpose, storage (Supabase),
+  match data (public, cached), third parties (no selling or sharing, no ads,
+  no third-party analytics), cookies and local storage, deletion (email from
+  the account address; account, operator record, and cell memberships
+  deleted within 14 days), Riot affiliation, contact, effective date
+- **Terms** — eyebrow `TERMS OF ENGAGEMENT`, H1 `Terms of Service`, 8
+  provisions in order: free hobby service provided as is, own the linked Riot
+  account / one account per person, no scraping, automation, abuse, or
+  rate-limit circumvention, suspension or deletion for violations, stats are
+  informational only (no metric is a skill rating, ranking, or MMR
+  assessment), Riot affiliation, California law, contact + effective date
+- The policy must match the code. The cookies/local-storage provision says
+  storage keeps the user signed in and remembers a few on-device settings —
+  the Supabase session, `legion_active_cell`, `legion_linked:<userId>`,
+  `legion_invite_dismissed_<cellId>`. A new stored key, tracker, or
+  third-party data flow means revising the policy and its effective date
 
 ### Authenticate (`/authenticate`)
 Single centered form card with a plain-language subtitle (sanctioned — see
@@ -964,7 +1010,7 @@ LEGION/
 │   │   ├── og.png                         <- 1200x630 link-preview card (dossier cover)
 │   │   ├── icons.svg                      <- icon sprite
 │   │   ├── robots.txt                     <- public routes indexable; case files and /api disallowed
-│   │   └── sitemap.xml
+│   │   └── sitemap.xml                    <- the five public routes
 │   └── src/
 │       ├── main.jsx                       <- app entry point
 │       ├── App.jsx                        <- routes, TitleSync, <main>, ErrorBoundary
@@ -984,7 +1030,7 @@ LEGION/
 │       │   ├── FetchFault.jsx             <- retrieval-failure card; 401 clears the session before re-auth
 │       │   ├── ErrorBoundary.jsx          <- render-fault card with reload
 │       │   ├── Redacted.jsx               <- <Redacted> / <RedactedBar> (aria-hidden + sr-only "[redacted]")
-│       │   ├── Footer.jsx                 <- classified doc footer
+│       │   ├── Footer.jsx                 <- classified doc footer + Riot legal line + Privacy/Terms links
 │       │   ├── ProtectedRoute.jsx         <- auth guard (redirect to /authenticate?return_to=…)
 │       │   ├── CellOverlay.jsx            <- zero-cell create/join overlay, retry card, solo-cell invite prompt
 │       │   ├── ConfirmModal.jsx           <- type-to-confirm dialog (error line, busy state)
@@ -993,6 +1039,8 @@ LEGION/
 │           ├── Landing.jsx
 │           ├── About.jsx
 │           ├── Authenticate.jsx           <- sign-in / new operator / passcode reset; safeReturnTo; error copy map
+│           ├── Privacy.jsx                <- privacy policy (public, plain-English provisions)
+│           ├── Terms.jsx                  <- terms of service (public, plain-English provisions)
 │           ├── Intake.jsx                 <- cell creation or join
 │           ├── Briefing.jsx               <- cell dashboard (remounts per cell)
 │           └── OperationLog.jsx           <- joint match history (remounts per cell)
@@ -1059,7 +1107,10 @@ pushes to `master` trigger a Vercel production deploy)
 **Supabase project:** `https://kulnpqrnyjxzdegzcivf.supabase.co`
 
 **What exists:**
-- All six pages implemented to the mockups; Briefing and Operation Log fully featured
+- All six app pages implemented to the mockups; Briefing and Operation Log fully featured
+- Legal (2026-09-27): Riot legal boilerplate + Privacy/Terms links in the
+  footer on every page; public `/privacy` and `/terms` pages (no mockups —
+  they reuse the About layout)
 - Full backend: cells/operators routes, Riot API service (rate limiter,
   timeouts, bounded cache), stats engine emitting the full payload (see Stats Engine)
 - Invite code system: generated at cell creation, `join-by-code` endpoint,
@@ -1092,8 +1143,10 @@ pushes to `master` trigger a Vercel production deploy)
 2. **Phase 5 — public exposure:** JSONB egress (`match_participants` table or
    a trimmed `summary` column — a DB change, so it needs a go-ahead; today
    `/stats` and `/operations` load every full match payload per page view),
-   shared rate limiter + production Riot key, privacy/ToS/account deletion,
-   monitoring, invite links, a LICENSE decision, and optionally a repo
+   shared rate limiter + production Riot key, self-serve account deletion
+   (privacy policy and terms now exist; deletion is manual — the policy
+   commits to it within 14 days of an emailed request), monitoring, invite
+   links, a LICENSE decision, and optionally a repo
    social-preview image (the OG card in `client/public/og.png` is ready for it)
 
 Also outstanding: Field Assessment full template library, invite code
@@ -1112,3 +1165,4 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-08-19 | Audit remediation Phases 1-3 shipped (commit `e1e468a`, deployed to production; DB migration `phase1_security_hardening` applied live). Phase 1: RLS reduced to a six-policy read/delete-only model (all writes server-side via service role), anon grants revoked, `join_cell_by_invite_code` RPC dropped, `created_by` ON DELETE SET NULL, service-key fail-fast, validate-riot-id per-IP throttle + result cache, crypto.randomInt invite codes + join throttle. Phase 2: Arena subteam grouping, remake exclusion, real season filter + pagination past the 1000-row cap, null WR for zero-game members, first test suite (`stats.test.js`, 12 tests, `npm test`), node-fetch dropped, Node >= 20. Phase 3: race-guarded fetches + per-cell state reset, dossier-toned error/retry states, Riot-link short-circuit + failure banner, full password-reset flow, keyboard-operable Intake radios + `NIGHT SHIFT` placeholder (ZOO lore violation cleared) |
 | 2026-08-20 | Audit remediation Phase 4 — accessibility, WCAG 2.1 AA pass (commit `9194eb2`): per-route titles + `<main>` + real heading tree; ConfirmModal dialog semantics, focus trap and restore; keyboard-reachable manage toggle (real sibling button, aria-expanded, Escape); Link Analysis nodes focusable and touch-operable, role/summary, dark text tiers, 7 -> 10 node cap; Campaign Record barcode wins-up/losses-down + tap crosshair; heatmap role=img + computed summary + visible PEAK caption; pool-bar sr-only summaries; `--muted-light` retired from text; profile badges re-tinted; redaction helpers aria-hidden + sr-only "[redacted]"; OpLog chips aria-pressed + role=group; tables th scope=col in `.table-scroll`; reduced-motion extended; 320/375 px reflow; Landing REPORT-01 and About glossary Tilt -> Campaign Record |
 | 2026-08-21 | Button-up pass (code, presentation, GitHub). Harvested four uncommitted worktrees (docs re-sync, Tilt copy purge in README + mockups, dead `.tilt-*`/matrix CSS). Server: season window falls back to last year's boundary Jan 1-9 (`services/season.js`, tested); ingest existence check chunked (PostgREST 1000-row cap) + 45 s time budget + auto-link error check; keyset pagination on `match_id`; Riot fetch 8 s timeout, bounded cache, match payloads uncached; `adjacent_cells` cross-cell disclosure removed from `/stats`; `/operations` uses `getSameTeamCellGroup` and emits `user_id`; shared `middleware/auth.js` (503 on Auth outage); UUID param guards, body-absent guards, Riot ID shape checks, cache bound; JSON 404 + error middleware, `x-powered-by` off, 16 kB body limit; `tilt_index` dropped from the payload; dead code removed; 20 new tests (32 total). Client: Briefing/OpLog remount per cell (fixes the sync-after-switch race and the new react-hooks lint); shared PageHeader / FetchFault / Redacted / ErrorBoundary / modes; `return_to` same-origin resolution (backslash bypass); 401 re-auth clears the session first; canonical Riot ID at sign-up; YOU by `user_id` everywhere; OpLog chip sort bug (`op.result`) fixed; sync banner covers every ingest status; empty-filter notice; Campaign Record gap cap; ConfirmModal error/busy states replace `alert()`; copy-to-clipboard confirmation; Supabase Auth error copy map; PASSCODE labels; ZOO glossary trimmed to the ruling; About "by Riot ID" copy fixed; contrast fixes; Link Analysis `role=group`; mock data dynamically imported behind `import.meta.env.DEV` (out of prod); vendor chunks (entry 525 -> 97 kB); fonts via `<link>`; meta description + Open Graph/Twitter cards + 1200x630 OG card + apple-touch-icon; on-brand favicon; robots.txt + sitemap.xml; Vercel asset caching + security headers; 32 dead CSS selectors removed; Vite template leftovers deleted. Repo: deps updated (0 vulnerabilities), package metadata (`legion-client` / `legion-server`, private, Node >= 20), `.nvmrc`, `.editorconfig`, GitHub Actions CI, README rewritten (OG banner, CI badge, env table, deployment notes), CLAUDE.md re-synced, GitHub topics set |
+| 2026-09-27 | Legal pass, three commits: Riot Games legal boilerplate (verbatim) + `Privacy` / `Terms` links added below the classified line in the shared footer (`0fefe4c`); public `/privacy` page, 10 plain-English provisions on the About layout (`ff22a9b`); public `/terms` page, 8 provisions (`c87ee07`). Per-route titles `PRIVACY // LEGION` / `TERMS // LEGION`. The local-storage provision was worded to match what the client actually stores rather than "only to keep you signed in". Docs: Copy Tone exception 4 (legal copy), routes table, footer spec, page features, file tree, status; `sitemap.xml` extended to the five public routes |
