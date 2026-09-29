@@ -220,15 +220,4 @@ router.post('/link', requireAuth, async (req, res) => {
   }
 })
 
-router.get('/:puuid', requireAuth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('operators')
-    .select('riot_game_name, riot_tag_line, is_verified, created_at')
-    .eq('puuid', req.params.puuid)
-    .single()
-
-  if (error) return res.status(404).json({ error: 'OPERATOR NOT FOUND.' })
-  res.json(data)
-})
-
 module.exports = router

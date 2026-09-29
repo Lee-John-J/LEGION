@@ -74,7 +74,6 @@ export const api = {
   getOperationLog: (id) => request(`/cells/${id}/operations`),
 
   // Operator endpoints
-  getOperator: (puuid) => request(`/operators/${puuid}`),
   linkRiotId: (data) =>
     request('/operators/link', { method: 'POST', body: JSON.stringify(data) }),
 

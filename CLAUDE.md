@@ -34,7 +34,7 @@ and want insight into how they perform *together*, not just individually.
 | Create or join a cell | OPEN NEW FILE | The intake process |
 | Dashboard / stats page | BRIEFING | All stats live here — there is no separate "Field Report" page |
 | Match history | OPERATION LOG | Filtered to joint deployments only |
-| Profile page | DOSSIER | Per-operator (reserved — no page yet; `GET /api/operators/:puuid` exists for it) |
+| Profile page | DOSSIER | Per-operator (reserved — no page or endpoint yet) |
 | Login | AUTHENTICATE | — |
 | Logout | DISENGAGE | — |
 | Password | PASSCODE | Form labels, buttons, and errors all say passcode |
@@ -847,7 +847,9 @@ and the UI says "Sync again to continue" while it is > 0.
 |---|---|---|
 | POST | `/api/operators/validate-riot-id` | **No auth** — public pre-signup check that a Riot ID exists; returns Riot's canonical `{valid, gameName, tagLine}`. Shape-checked (game name 3-16 chars, tag 3-5 -> 400 otherwise); per-IP throttle (10/min) + five-minute result cache guard the Riot quota; 404 `RIOT_ID_NOT_FOUND` / 429 / 503 `RIOT_UNAVAILABLE` |
 | POST | `/api/operators/link` | Link/update Riot account for current user (short-circuits when the stored ID already matches; 409 if the PUUID belongs to another operator) |
-| GET | `/api/operators/:puuid` | Operator dossier by PUUID: `riot_game_name, riot_tag_line, is_verified, created_at` (reserved for the DOSSIER page; no client caller yet) |
+
+There is deliberately no operator lookup endpoint — see Open Questions,
+"Operator lookup by PUUID — REMOVED".
 
 ### Health
 | Method | Path | Description |
@@ -1003,10 +1005,6 @@ Still open:
   per-game resolution. A 30D / SPLIT / SEASON range selector (with per-night
   resolution at 30D) was designed but deliberately cut — revisit if cells with
   long histories find the chart crowded.
-- **`GET /api/operators/:puuid`:** unused by the client; any signed-in user
-  who has a PUUID can learn whether that player is on LEGION and when they
-  joined. John deferred the keep/remove call (2026-09-29) to a separate
-  conversation about letting operators find and add each other
 - **Invite code regeneration:** scoped to the handler role in V1 but unbuilt —
   no endpoint or UI exists to rotate a cell's code.
 - **Leaving a cell / handler-less cells:** a non-handler has no way to leave
@@ -1031,6 +1029,12 @@ Resolved during build (on record so they are not re-litigated):
 - **Redacted observation count — RESOLVED:** one to three of six, seeded by
   the data (deliberately varied so the card set feels different as matches
   come in).
+- **Operator lookup by PUUID — REMOVED 2026-09-29:** `GET
+  /api/operators/:puuid` had no client caller and told any signed-in user
+  whether a given player was on LEGION and when they joined, bypassing the
+  operators RLS rule (own row only) and the Privacy Policy's cellmates-only
+  promise. Deleted with its unused `api.getOperator` helper. A future DOSSIER
+  page gets its own endpoint, built with the page and limited to cellmates.
 
 ---
 
@@ -1123,7 +1127,7 @@ LEGION/
     │   └── supabase.js                    <- Supabase client init (service role key, fail-fast)
     ├── routes/
     │   ├── cells.js                       <- cells CRUD, join-by-code, ingest, stats, operations (UUID guards, keyset reads)
-    │   └── operators.js                   <- validate Riot ID, link Riot ID, get dossier
+    │   └── operators.js                   <- validate Riot ID, link Riot ID
     └── services/
         ├── riot.js                        <- rate-limited, timeout-guarded Riot API calls + bounded cache
         ├── season.js                      <- season window helpers (pure)
@@ -1241,3 +1245,4 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-09-27 | Legal pass, three commits: Riot Games legal boilerplate (verbatim) + `Privacy` / `Terms` links added below the classified line in the shared footer (`0fefe4c`); public `/privacy` page, 10 plain-English provisions on the About layout (`ff22a9b`); public `/terms` page, 8 provisions (`c87ee07`). Per-route titles `PRIVACY // LEGION` / `TERMS // LEGION`. The local-storage provision was worded to match what the client actually stores rather than "only to keep you signed in". Docs: Copy Tone exception 4 (legal copy), routes table, footer spec, page features, file tree, status; `sitemap.xml` extended to the five public routes |
 | 2026-09-28 | Full copy audit (correctness, style, legal, public-site practice) and fixes. Legal: footer Riot notice switched to Riot's exact required wording (contractions + comma); competitor names removed from About and README (new Copy Tone exception 5); Privacy Policy rewritten to 14 provisions matching the code (hashed passwords, cellmate visibility, whole-season match cache incl. other players, providers incl. Google Fonts, no cookies, retention, rights, under-13s, changes); Terms rewritten to 14 (agreement, 13+, warranty disclaimer, liability cap, invite codes, cell-name rules, fictional-theme notice, changes); both effective 2026-09-28 via `lib/legal.js`; sign-up agreement line + Americas jurisdiction note on New Operator. Accuracy: Landing no longer claims solo matches are "not retained" (ingest stores them) and no longer advertises post-loss analysis; About/overlay explain Sync Intel instead of implying automatic polling; Champion Pools notes counted `top_champions` (max 5) as the unique-champion total — now `unique_champions`; analyst templates no longer assert unchecked facts ("consistent across game modes", invented per-session averages, Riot matchmaking "recalibration"); ARAM: Mayhem advisory states the API fact without attributing intent; region meta AMERICAS. Consistency: INVITE CODE everywhere (was intake/invite), `Open New File`, `JOIN CELL` submit in join mode, `ARAM: Mayhem` (Riot's name) client + server, plurals via `lib/format.js`, server errors end in periods, "contact handler" removed, raw network/HTTP errors translated in `lib/api.js`, ALL-MALE/FEMALE ROSTER -> CHAMPION POOL, you@example.com placeholders, TAGLINE label, About eyebrow ORIENTATION. Dead `legion-pi-nine.vercel.app` (404) replaced by `www.legion.report` in OG/Twitter meta, sitemap, robots, README. Mockups synced for the changed strings |
 | 2026-09-29 | Copy audit follow-ups (John's answers). Riot compliance: analyst observations and pool notes rewritten to highlight decisions instead of directing them ("Continued deployment recommended", "reassignment advisable", "co-deployment inadvisable", "continued use optimal" removed — Riot game-integrity policy on decision diversity; new Copy Tone voice rule); custom games (queue 0) excluded from stats and the Operation Log (`isCustomGame`, +1 test, 33 total); champion-gender profile tags removed end to end (data field, tag, notes, CSS, mock). Fonts self-hosted via `@fontsource` (Google Fonts links removed; Privacy provider list updated; both legal effective dates now 2026-09-29). About: five-step intake procedure written to be followed without the glossary; glossary expanded to every unexplained UI term (HANDLER, INVITE CODE, DISENGAGE, SYNC INTEL, THEATER, FIELD ASSESSMENT added; OPEN NEW FILE and others rewritten plainly); Intake option copy clarified and `?mode=join` preselect from the overlay's JOIN WITH INVITE CODE; invite banner and solo overlay say each friend opens their own file. SEO without visible change: home title without Riot marks, per-route descriptions + canonical via `RouteMeta`, WebSite JSON-LD. California governing law confirmed |
+| 2026-09-29 | Removed `GET /api/operators/:puuid` and the unused `api.getOperator` client helper. No page called it, and it let any signed-in user confirm whether a given player was on LEGION and when they joined — outside the operators RLS rule and the Privacy Policy's cellmates-only wording. Docs: API table, DOSSIER terminology row, file tree; moved from Open Questions to Resolved |
