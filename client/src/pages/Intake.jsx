@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import Footer from '../components/Footer'
@@ -8,7 +8,9 @@ import { Redacted as R } from '../components/Redacted'
 export default function Intake() {
   const navigate = useNavigate()
   const { refreshCells, setActiveCell } = useAuth()
-  const [mode, setMode] = useState('new')
+  // "JOIN WITH INVITE CODE" links here with ?mode=join preselected
+  const [searchParams] = useSearchParams()
+  const [mode, setMode] = useState(searchParams.get('mode') === 'join' ? 'join' : 'new')
   const [cellName, setCellName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState(null)
@@ -68,11 +70,11 @@ export default function Intake() {
           <div className="form-card-banner">
             CONFIDENTIAL // CELL INTAKE // HANDLE WITH CARE
           </div>
-          <h1 className="form-title">Open a New File</h1>
+          <h1 className="form-title">Open New File</h1>
           <p className="form-subtitle">
-            Designate the cell. A case file will be opened on intake; subsequent
-            joint deployments are logged and assessed against{' '}
-            <R w={48} h={11} /> baselines.
+            Designate a new cell, or join an existing one with its invite code.
+            Joint deployments are logged and assessed against{' '}
+            <R w={48} h={11} /> baselines once two or more operators are on file.
           </p>
 
           {error && (
@@ -97,7 +99,8 @@ export default function Intake() {
             <div>
               <div className="option-title">Open a New Case</div>
               <div className="option-desc">
-                Additional operators may be appended after intake.
+                Name a new cell. You become its handler and receive an invite
+                code to share with your group.
               </div>
             </div>
           </label>
@@ -133,7 +136,7 @@ export default function Intake() {
             <div>
               <div className="option-title">Join an Existing Case</div>
               <div className="option-desc">
-                Provide the invite code issued by the cell&rsquo;s handler.
+                Enter the invite code shared by an operator in that cell.
               </div>
             </div>
           </label>
@@ -156,7 +159,7 @@ export default function Intake() {
           )}
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'PROCESSING...' : 'OPEN NEW FILE'}
+            {loading ? 'PROCESSING...' : mode === 'join' ? 'JOIN CELL' : 'OPEN NEW FILE'}
           </button>
         </form>
       </section>

@@ -63,14 +63,14 @@ function sendRiotError(res, err) {
     return res.status(429).json({ code: 'RATE_LIMITED', error: 'INTAKE QUEUE SATURATED. STAND BY, THEN RE-SUBMIT.' })
   }
   console.error('[RIOT] lookup failed:', err.kind, err.status)
-  return res.status(503).json({ code: 'RIOT_UNAVAILABLE', error: 'RIOT API UNAVAILABLE. TRY AGAIN SHORTLY.' })
+  return res.status(503).json({ code: 'RIOT_UNAVAILABLE', error: 'RIOT GAMES API UNAVAILABLE. RETRY SHORTLY.' })
 }
 
 // ── Riot ID shape check ──────────────────────────────────────────
 // Riot enforces 3-16 characters for game names and 3-5 for tag lines.
 // Checking the shape here keeps non-strings and overlong junk from ever
 // becoming Riot lookups or cache keys.
-const RIOT_ID_ERROR = 'RIOT ID REQUIRED: GAME NAME (3-16 CHARACTERS) + TAG (3-5).'
+const RIOT_ID_ERROR = 'RIOT ID REQUIRED: GAME NAME (3-16 CHARACTERS) AND TAGLINE (3-5 CHARACTERS).'
 
 function parseRiotId(body) {
   const riotGameName = typeof body?.riotGameName === 'string' ? body.riotGameName.trim() : ''
@@ -211,12 +211,12 @@ router.post('/link', requireAuth, async (req, res) => {
 
     if (error) {
       console.error('[LEGION] DB error during operator link:', error.message)
-      return res.status(500).json({ error: 'DATABASE ERROR. CONTACT HANDLER.' })
+      return res.status(500).json({ error: 'DATABASE ERROR. RETRY SHORTLY.' })
     }
     res.json(data)
   } catch (crash) {
     console.error('[LEGION] operators/link CRASH:', crash)
-    return res.status(500).json({ error: 'INTERNAL ERROR' })
+    return res.status(500).json({ error: 'INTERNAL ERROR.' })
   }
 })
 
@@ -227,7 +227,7 @@ router.get('/:puuid', requireAuth, async (req, res) => {
     .eq('puuid', req.params.puuid)
     .single()
 
-  if (error) return res.status(404).json({ error: 'OPERATOR NOT FOUND' })
+  if (error) return res.status(404).json({ error: 'OPERATOR NOT FOUND.' })
   res.json(data)
 })
 

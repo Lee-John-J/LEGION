@@ -1,7 +1,7 @@
 # LEGION — Project Intelligence Brief
 **CLASSIFICATION: INTERNAL USE ONLY**
 **DOCUMENT TYPE: DEVELOPMENT DIRECTIVE**
-**LAST UPDATED: 2026-09-27**
+**LAST UPDATED: 2026-09-29**
 
 ---
 
@@ -40,6 +40,7 @@ and want insight into how they perform *together*, not just individually.
 | Password | PASSCODE | Form labels, buttons, and errors all say passcode |
 | Settings | DIRECTIVES | — |
 | Match with 2+ cell members on the same team | JOINT DEPLOYMENT | Core concept — this is what LEGION tracks |
+| Cell join code | INVITE CODE | `LGN-XXXX-XXXX`; the banner/overlay label is `CELL INVITE CODE` (never "intake code") |
 | Season trend chart | CAMPAIGN RECORD | Rolling 20-game WR over joint deployments, game-time axis |
 | Analyst-written stat observations | FIELD ASSESSMENT | Templated, severity-coded cards |
 | Parent agency (lore) | ZOO | See Lore section below |
@@ -95,7 +96,7 @@ and is never explained in the UI.
 - Client pages never import `lib/mockData.js` statically — only through the
   `import.meta.env.DEV` gate in `lib/devMock.js` (see Dev Preview below)
 - Keep lint and tests green: `npm run lint` in `client/`, `npm test` in
-  `server/` (`node --test`, 32 tests). CI runs both. Node >= 20 (`.nvmrc`)
+  `server/` (`node --test`, 33 tests). CI runs both. Node >= 20 (`.nvmrc`)
 - `.editorconfig` is the formatting contract: two-space indent, LF, UTF-8
 
 ---
@@ -165,8 +166,10 @@ and is never explained in the UI.
 - **Data / Descriptions:** `IBM Plex Mono` — monospaced, clinical
 - **Classification labels:** ALL CAPS, tracked wide, small size
 - **DO NOT USE:** Inter, Roboto, or any generic sans-serif defaults
-- Fonts load via `<link rel="preconnect">` + stylesheet `<link>` in
-  `client/index.html` (not a CSS `@import`) so the request starts with the HTML
+- Fonts are self-hosted: `@fontsource/*` weight files imported at the top of
+  `client/src/main.jsx` (Space Grotesk 400-700, IBM Plex Mono 300-600, Courier
+  Prime 400/700) and bundled into `/assets`. No Google Fonts request — visitor
+  IPs never reach a third party, which the Privacy Policy relies on
 
 ### UI Rules
 - Minimalist first — every element must earn its place (unused CSS is removed,
@@ -204,6 +207,19 @@ Write all UI copy as if authored by a Cold War intelligence analyst.
 - Solo activity is "out of scope" — not a limitation, a feature
 - Estimative language for assessments: `HIGH CONFIDENCE`, `MODERATE CONFIDENCE`,
   `LOW CONFIDENCE`, `ALMOST CERTAINLY`, `PROBABLY`, `LIKELY`, `UNLIKELY`
+- Analyst copy (observations, pool notes, badges) HIGHLIGHTS game decisions
+  and never directs them. Riot's game-integrity policy: products "should
+  increase, and not decrease the diversity of game decisions… may highlight
+  decisions". So: "Outcomes for this selection exceed parity", never
+  "Continued deployment recommended"; "flagged as the cell's weakest
+  environment", never "reassignment advisable". Notes that nudge toward MORE
+  variety (one-trick ban exposure) are fine
+- Analyst copy states only what the code measured — no invented figures or
+  unchecked claims ("consistent across game modes"), and nothing about how
+  Riot tunes matchmaking
+- No Riot trademarks in page titles or other keyword surfaces (Riot's
+  fan-content policy bars using its names as search keywords); descriptive
+  mentions in body copy and the meta description are fine
 - Third-party error strings are translated, never surfaced raw: Supabase
   Auth messages map through `AUTH_ERROR_COPY` in `Authenticate.jsx`
   (e.g. "Invalid login credentials" -> `CREDENTIALS NOT RECOGNIZED. VERIFY
@@ -241,8 +257,14 @@ Write all UI copy as if authored by a Cold War intelligence analyst.
    provision bodies are plain English — they are real legal documents, not
    lore. Only their chrome (doc-stamp, eyebrows, headings, footer) carries
    the dossier voice, and nothing in the provision text is redacted. The
-   footer's Riot Games legal line is reproduced verbatim: never redact,
-   abbreviate, uppercase, or restyle it.
+   footer's Riot Games legal line is Riot's required notice word for word
+   (contractions and comma included — see Footer): never reword, redact,
+   abbreviate, uppercase, or restyle it. The New Operator form's agreement
+   line (13+, Terms, Privacy) is legal copy too and stays plain English.
+5. **Competitors are never named** (on record 2026-09-28) — not on the site,
+   in meta tags, or in the README. Describe what LEGION does, not what other
+   products do. The About page's unnamed "adjacent agencies" line is lore and
+   stays.
 
 ---
 
@@ -432,11 +454,16 @@ production builds — verified by grepping `dist/` after `vite build`.
 > terminology concept — the Briefing page IS the stats page.
 
 `App.jsx` also provides: per-route `document.title` (`BRIEFING // LEGION`
-etc. via `TitleSync`), a `<main>` landmark, and an `ErrorBoundary` around the
+etc.; home is `LEGION // Group Stats for Players Who Queue Together`),
+per-route meta description on the public pages, and a canonical
+`https://www.legion.report<path>` link — all via `RouteMeta` — plus a
+`<main>` landmark, and an `ErrorBoundary` around the
 routes so a render fault shows a `RETRIEVAL FAULT` card (with RELOAD) under a
 still-usable header instead of a blank page. `robots.txt` disallows
 `/briefing`, `/oplog`, `/intake`, `/api/`; `sitemap.xml` lists the five
 public routes (`/`, `/about`, `/authenticate`, `/privacy`, `/terms`).
+`index.html` carries the static fallbacks (title, description, canonical) and
+a schema.org `WebSite` JSON-LD block naming the site for search results.
 
 ---
 
@@ -474,7 +501,7 @@ Shared component `components/PageHeader.jsx`, sticky below the dark header:
 - Eyebrow: `• CELL BRIEFING — ACTIVE` / `• OPERATION LOG — ACTIVE`
   (`— INACTIVE` with no active cell)
 - H1: active cell name
-- Meta line: `N operators // region NA // established DATE // case LGN-███`
+- Meta line: `N operators // region AMERICAS // established DATE // case LGN-███`
 - Inline `+ Sync Intel` button (`SYNCING...` while busy) — triggers match
   ingest. The result line (`role=status`) has one sentence per ingest
   outcome: `INGEST COMPLETE — N new matches filed, M already on record`,
@@ -493,10 +520,11 @@ with tail `CLEARED FOR EXTERNAL DISTRIBUTION`; Privacy `PRIV-` and Terms
 
 Below that line, on every page (`.footer-legal`, `.footer-legal-links`:
 `--font-mono`, 11px, `--muted`, sentence case, no tracking):
-1. Riot Games legal boilerplate, verbatim (see Copy Tone exception 4):
-   "LEGION is not endorsed by Riot Games and does not reflect the views or
+1. Riot Games legal boilerplate — the exact notice required by
+   developer.riotgames.com/policies/general (see Copy Tone exception 4):
+   "LEGION isn't endorsed by Riot Games and doesn't reflect the views or
    opinions of Riot Games or anyone officially involved in producing or
-   managing Riot Games properties. Riot Games and all associated properties
+   managing Riot Games properties. Riot Games, and all associated properties
    are trademarks or registered trademarks of Riot Games, Inc."
 2. `Privacy` -> `/privacy` and `Terms` -> `/terms` links (underlined,
    `<nav aria-label="Legal">`)
@@ -508,7 +536,7 @@ Below that line, on every page (`.footer-legal`, `.footer-legal-links`:
 ### Landing (`/`)
 1. **Hero** — wordmark, tagline, plain-language subline (sanctioned — see
    Copy Tone exceptions), sub-tagline, two CTAs:
-   - Primary: `Open a New File` -> `/authenticate`
+   - Primary: `Open New File` -> `/authenticate`
    - Secondary: `Already on file? Authenticate ->` -> `/authenticate`
 2. **Stats strip** — four stat blocks:
    - `Matches Filed: ████ [CLASSIFIED]` (pre-launch state, sanctioned —
@@ -526,12 +554,21 @@ Below that line, on every page (`.footer-legal`, `.footer-legal-links`:
 ### About (`/about`)
 1. **Hero** — doc-stamp + H1 `About LEGION` + three lead paragraphs: plain-language
    first (sanctioned — see Copy Tone exceptions), ZOO mention #1 in the second
-2. **Intake Procedure** — four-step informational list (step 3: operators are
-   appended via the cell's invite code — there is no append-by-Riot-ID path)
-3. **Glossary of Field Terms** — nine named entries (CELL, OPERATOR, OPEN NEW
-   FILE, AUTHENTICATE, BRIEFING, OPERATION LOG, JOINT DEPLOYMENT, CAMPAIGN
-   RECORD, ZOO) plus one fully redacted decorative row; the ZOO entry
-   (mention #2) is `████. Parent agency. ████.` per LORE: ZOO
+2. **Intake Procedure** (`#intake`) — five plain, followable steps in the
+   order setup really happens: Open an operator file (New Operator tab,
+   Americas servers only, confirm the email, sign in) → Designate the cell
+   (creator becomes handler; joiners enter a code here) → Distribute the
+   invite code (each friend opens their own file, then joins) → Deploy
+   together → Sync intel (LEGION never syncs on its own). There is no
+   append-by-Riot-ID path. Rendered from the `PROCEDURE` array
+3. **Glossary of Field Terms** — every term the interface uses without
+   explaining it, from the `GLOSSARY` array: CELL, OPERATOR, HANDLER, INVITE
+   CODE, OPEN NEW FILE, AUTHENTICATE, DISENGAGE, SYNC INTEL, BRIEFING,
+   OPERATION LOG, JOINT DEPLOYMENT (= OPS), THEATER (modes roll up into three
+   maps), CAMPAIGN RECORD, FIELD ASSESSMENT (CLASSIFIED cards are
+   decorative), ZOO, plus one fully redacted decorative row; the ZOO entry
+   (mention #2) is `████. Parent agency. ████.` per LORE: ZOO. A new
+   user-facing term gets a glossary entry
 4. **CTA section** — `Open New File` + `Return to Home` buttons
 5. Footer
 
@@ -541,26 +578,39 @@ Public legal pages on the About layout: doc-stamp hero (`LGN-PRIV-001` /
 provisions in the `.intake-list` card (`.legal-body` adds the underlined
 in-text mailto links and the closing gap, since there is no CTA band), then
 the footer. Dossier voice in the chrome only; provision bodies are plain
-English (Copy Tone exception 4). Contact `contact@legion.report`; both
-effective September 26, 2026.
-- **Privacy** — eyebrow `PRIVACY DIRECTIVE`, H1 `Privacy Policy`, 10
-  provisions in order: information on file (email + password via Supabase
-  Auth, Riot ID, PUUID, public match data), purpose, storage (Supabase),
-  match data (public, cached), third parties (no selling or sharing, no ads,
-  no third-party analytics), cookies and local storage, deletion (email from
-  the account address; account, operator record, and cell memberships
-  deleted within 14 days), Riot affiliation, contact, effective date
-- **Terms** — eyebrow `TERMS OF ENGAGEMENT`, H1 `Terms of Service`, 8
-  provisions in order: free hobby service provided as is, own the linked Riot
-  account / one account per person, no scraping, automation, abuse, or
-  rate-limit circumvention, suspension or deletion for violations, stats are
-  informational only (no metric is a skill rating, ranking, or MMR
-  assessment), Riot affiliation, California law, contact + effective date
-- The policy must match the code. The cookies/local-storage provision says
-  storage keeps the user signed in and remembers a few on-device settings —
+English (Copy Tone exception 4). Provisions are data arrays rendered as
+numbered steps. Contact address and both effective dates (September 29, 2026)
+live in `lib/legal.js`; the mailbox must receive mail (see Current Status).
+- **Privacy** — eyebrow `PRIVACY DIRECTIVE`, H1 `Privacy Policy`, 14
+  provisions: information on file (account — password hashed by Supabase
+  Auth; Riot ID + PUUID; cells; match data — whole-season records including
+  games without the cell, and other players' Riot IDs/stats as Riot provides
+  them; technical data — provider logs + in-memory IP throttle), purpose (no
+  marketing email), who can see it (cellmates see Riot ID + joint stats;
+  email never shown), storage and service providers (Supabase, US; Vercel;
+  Riot Games API; everything else, typefaces included, served first-party),
+  no selling / no ads / no analytics, cookies
+  and local storage (no cookies), retention and deletion (14 days; handled
+  cells stay with remaining operators; cached match records may persist,
+  unlinked), your choices (copy/correct/delete, 30 days), children (not
+  directed to under-13s), security, affiliation, changes, contact, effective
+  date
+- **Terms** — eyebrow `TERMS OF ENGAGEMENT`, H1 `Terms of Service`, 14
+  provisions: agreement, eligibility (13+, guardian permission under the age
+  of majority), service as is (no warranties; Riot API dependency), your
+  account (own the Riot account, one per person), cells and invite codes
+  (joining shares Riot ID + joint stats; codes admit anyone who holds them),
+  acceptable use (no scraping/automation/rate-limit circumvention/
+  impersonation; cell-name rules), suspension and deletion, nature of the
+  statistics (information and entertainment; templated notes may be
+  inaccurate; no skill rating/ranking/MMR), fictional theme (not affiliated
+  with any government agency; names no agency), limitation of liability
+  (US$50 cap), Riot Games, changes, California law (John is in
+  California — confirmed 2026-09-29), contact + effective date
+- The policy must match the code. No cookies are set; local storage holds
   the Supabase session, `legion_active_cell`, `legion_linked:<userId>`,
-  `legion_invite_dismissed_<cellId>`. A new stored key, tracker, or
-  third-party data flow means revising the policy and its effective date
+  `legion_invite_dismissed_<cellId>`. A new stored key, tracker, provider,
+  or third-party data flow means revising the policy and its effective date
 
 ### Authenticate (`/authenticate`)
 Single centered form card with a plain-language subtitle (sanctioned — see
@@ -568,26 +618,31 @@ Copy Tone exceptions) and tab toggle (`role=tablist`):
 - **Sign In tab (default):** EMAIL + PASSCODE, `AUTHENTICATE` button,
   `Forgot passcode?` link into the reset flow (request form; set-new-passcode
   form when arriving from the recovery email)
-- **New Operator tab:** EMAIL + PASSCODE (min 8) + RIOT GAME NAME + TAG,
-  `OPEN OPERATOR FILE` button. On success the card shows the `IDENTITY LOGGED`
-  notice (email confirmation required); after confirming and signing in, a
-  zero-cell operator is routed to `/intake`
-- Errors render as `ACCESS DENIED: <dossier line>` (`role=alert`), translated
-  from Supabase's raw strings
+- **New Operator tab:** EMAIL + PASSCODE (min 8) + RIOT GAME NAME + TAGLINE,
+  a `JURISDICTION: AMERICAS SERVERS ONLY (NA, BR, LAN, LAS).` note (Riot
+  `americas` routing), `OPEN OPERATOR FILE` button, and a plain-English
+  agreement line under it (13+, links to Terms and Privacy). On success the
+  card shows the `IDENTITY LOGGED` notice (email confirmation required);
+  after confirming and signing in, a zero-cell operator is routed to `/intake`
+- Errors render in `role=alert`, translated from Supabase's raw strings
+  (network faults included); sign-in failures carry the `ACCESS DENIED:`
+  prefix, sign-up and reset errors do not
+- Email placeholders are `you@example.com` (a reserved domain)
 
 ### Intake (`/intake`)
 Cell designation flow (account setup already happened on authenticate page).
 - Classification banner: `CONFIDENTIAL // CELL INTAKE // HANDLE WITH CARE`
-- H1: `Open a New File`
-- Two radio options (real radio inputs — keyboard and screen-reader operable):
+- H1: `Open New File`
+- Two radio options (real radio inputs — keyboard and screen-reader operable;
+  `?mode=join` preselects the second):
   - **Open a New Case:** reveals Cell Name field (placeholder `e.g. NIGHT
     SHIFT`, maxLength 64; server rejects empty / >64 with 400)
   - **Join an Existing Case:** reveals Invite Code field (`LGN-XXXX-XXXX`,
     auto-uppercase, format-validated client-side, maxLength 13)
 - Client-side errors: `CELL NAME IS REQUIRED.`, `INVITE CODE IS REQUIRED.`,
   `INVITE CODE INVALID OR EXPIRED.`; busy label `PROCESSING...`
-- Submit: `OPEN NEW FILE`; both paths land on `/briefing` with the new or
-  joined cell active
+- Submit: `OPEN NEW FILE` (new case) / `JOIN CELL` (invite code); both paths
+  land on `/briefing` with the new or joined cell active
 
 ### Briefing (`/briefing`)
 Main dashboard — ALL stats live here. The page remounts per active cell
@@ -601,7 +656,7 @@ top-to-bottom:
    (the sign-in Riot link failed; not dismissible — it is actionable) and the
    shared `FetchFault` card (`CLEARANCE EXPIRED` with RE-AUTHENTICATE, or
    `RETRIEVAL FAULT` with RE-ATTEMPT RETRIEVAL / `RETRYING...`)
-3. **Invite code banner** — collapsible `CELL INTAKE CODE` strip: the cell's
+3. **Invite code banner** — collapsible `CELL INVITE CODE` strip: the cell's
    `LGN-XXXX-XXXX` code with a COPY button that confirms as `COPIED` for ~1.6 s
    (`hooks/useClipboard.js`), collapsible to a slim reopenable bar
 4. **Cell Members card:**
@@ -617,12 +672,13 @@ top-to-bottom:
      first (Riot names change; ids never do), display name as fallback
 5. **Game Mode Breakdown card:**
    - Horizontal bars per mode. All six staple modes always render (Ranked,
-     Ranked Flex, Normal, ARAM, ARAM Mayhem, Arena — 0-game rows show
+     Ranked Flex, Normal, ARAM, ARAM: Mayhem, Arena — 0-game rows show
      `no data` / `—`), then rotating modes under a `Featured / Rotating` divider
    - 5-tier color scale: `>=62%` deep green, `>50%` medium green, `=50%` gray, `>=40%` medium red, `<40%` deep red
    - WR text color matches bar tier (dark tiers only — contrast)
-   - Card ends with the ARAM Mayhem advisory (`ARAM: Mayhem match data is
-     withheld from Riot API by directive…`)
+   - Card ends with the ARAM: Mayhem advisory (`ARAM: Mayhem match data is
+     not released through the Riot Games API…` — match-v5 answers 403 for
+     queue 2400; the copy states the fact without attributing intent to Riot)
 6. **Two-column row:**
    - **Link Analysis** (left): SVG ring network graph (`role=group` — it
      contains focusable nodes — with a per-pair text summary). Active
@@ -671,9 +727,10 @@ top-to-bottom:
      remainder, tooltip `<champ> — X% pick rate // Y% WR (W-L)`, sr-only summary)
    - The Summoner's Rift header additionally carries one profile badge from
      the server's `profile_tags` when SR games >= 5 — role (`BOT SPECIALIST`,
-     `MID / TOP FLEX`, `FILL AGENT`), class (`PRECISION DOCTRINE`, …), gender
-     (`ALL-MALE ROSTER` / `ALL-FEMALE ROSTER`), or trait (`EDGELORD BIAS`,
-     `HIGH MOBILITY BIAS`, …) — from `server/data/champions.js`
+     `MID / TOP FLEX`, `FILL AGENT`), class (`PRECISION DOCTRINE`, …), or
+     trait (`EDGELORD BIAS`, `HIGH MOBILITY BIAS`, …) — from
+     `server/data/champions.js`. Champion-gender tags were removed
+     2026-09-29 (read as commentary on the players); do not reintroduce
    - Terse bureaucratic note: two templated sentences plus an optional
      profile line, seeded by the operator name
 10. **Analyst Observations (Field Assessments)** (`• Field Assessment`):
@@ -727,7 +784,8 @@ When authenticated but belonging to zero cells:
   `NO ACTIVE CASE FILES`, a divider, and `+ Open New File`
 - Page header renders its redacted equivalent (`— INACTIVE`)
 - Body shows a centered `CellOverlay` card pointing to `/intake` (OPEN NEW
-  FILE / JOIN WITH INVITE CODE)
+  FILE / JOIN WITH INVITE CODE — the latter opens `/intake?mode=join` with the
+  join option preselected)
 
 Solo cells (one member on file) get a second `CellOverlay` state: a
 dismissible overlay surfacing the cell's invite code (COPY CODE -> `COPIED`)
@@ -830,11 +888,14 @@ PUUIDs as the permanent identifier. All lookups use PUUID after initial resoluti
 ## STATS ENGINE
 
 `computeCellStats(matches, cellPuuids, memberRoster = [])` in
-`services/stats.js` (also exports `isRemake`, `getSameTeamCellGroup`). The
+`services/stats.js` (also exports `isRemake`, `isCustomGame`,
+`getSameTeamCellGroup`). The
 roster `{id, puuid, riot_game_name}` supplies `user_id` and pads zero-game or
 unlinked members. Two corrections applied before any computation (audit
-Phase 2): remakes (early-surrender voids / under-five-minute games) are dropped
-entirely, and Arena (CHERRY) matches group cell members by `playerSubteamId`
+Phase 2): remakes (early-surrender voids / under-five-minute games) and
+custom games (queue 0, incl. tournament-code lobbies — Riot's League policy
+bars displaying custom-match history without the player's specific opt-in;
+excluded from `/operations` too) are dropped entirely, and Arena (CHERRY) matches group cell members by `playerSubteamId`
 instead of `teamId` — Arena stamps only two teamIds, so same-teamId members
 can be opponents. `getSameTeamCellGroup` is the single joint-deployment rule,
 shared with the `/operations` route.
@@ -869,9 +930,9 @@ Returns:
   top_champions (<= 5), unique_champions, theaters {SUMMONER'S RIFT | HOWLING
   ABYSS | RINGS OF WRATH -> games, wins, win_rate, top_champions,
   unique_champions}, last_played, role_distribution, class_distribution,
-  profile_tags (<= 3 {label, category: role|class|gender|trait, strength}),
+  profile_tags (<= 3 {label, category: role|class|trait, strength}),
   primary_role, primary_class`; sorted by win rate desc then games. Theater
-  mapping: ARAM / ARAM Mayhem -> HOWLING ABYSS, Arena -> RINGS OF WRATH,
+  mapping: ARAM / ARAM: Mayhem -> HOWLING ABYSS, Arena -> RINGS OF WRATH,
   everything else -> SUMMONER'S RIFT. Profiles come from
   `data/champions.js analyzeProfile` (empty under three games)
 - **`duo_stats`** — per-pair `{puuids[2], names[2], games, wins, win_rate}`,
@@ -894,10 +955,10 @@ A tilt heuristic (post-loss WR, loss streaks, late-session decay) is computed
 server-side to feed the SESSION DISCIPLINE observation only; it is **not**
 part of the payload (no UI consumes it).
 
-**Tests** (`npm test`, `node --test`, 32): `stats.test.js` (audit set —
+**Tests** (`npm test`, `node --test`, 33): `stats.test.js` (audit set —
 Arena, remakes, roster padding), `stats.engine.test.js` (timeline, duo links,
 WR-without, mode breakdown, heatmap, recent form, synergies, remake
-boundaries, mixed teams, payload shape), `season.test.js` (boundary cases);
+boundaries, custom-game exclusion, mixed teams, payload shape), `season.test.js` (boundary cases);
 builders in `test-helpers.js`.
 
 ---
@@ -942,6 +1003,10 @@ Still open:
   per-game resolution. A 30D / SPLIT / SEASON range selector (with per-night
   resolution at 30D) was designed but deliberately cut — revisit if cells with
   long histories find the chart crowded.
+- **`GET /api/operators/:puuid`:** unused by the client; any signed-in user
+  who has a PUUID can learn whether that player is on LEGION and when they
+  joined. John deferred the keep/remove call (2026-09-29) to a separate
+  conversation about letting operators find and add each other
 - **Invite code regeneration:** scoped to the handler role in V1 but unbuilt —
   no endpoint or UI exists to rotate a cell's code.
 - **Leaving a cell / handler-less cells:** a non-handler has no way to leave
@@ -1012,8 +1077,8 @@ LEGION/
 │   │   ├── robots.txt                     <- public routes indexable; case files and /api disallowed
 │   │   └── sitemap.xml                    <- the five public routes
 │   └── src/
-│       ├── main.jsx                       <- app entry point
-│       ├── App.jsx                        <- routes, TitleSync, <main>, ErrorBoundary
+│       ├── main.jsx                       <- app entry point + self-hosted @fontsource imports
+│       ├── App.jsx                        <- routes, RouteMeta (title/description/canonical), <main>, ErrorBoundary
 │       ├── index.css                      <- Tailwind + LEGION design tokens (no dead rules)
 │       ├── lib/
 │       │   ├── supabase.js                <- Supabase client init (fails fast on missing env)
@@ -1102,7 +1167,8 @@ Audit remediation Phases 1-4 shipped (Phases 1-3 in `e1e468a`, Phase 4
 accessibility in `9194eb2`; DB migration `phase1_security_hardening` applied
 live). Button-up pass 2026-08-21 (see Session Log) — lint clean, 32/32 tests,
 CI workflow in place.
-**Live site:** `https://legion-pi-nine.vercel.app` (GitHub: `Lee-John-J/LEGION`;
+**Live site:** `https://www.legion.report` (apex redirects to www; the old
+`legion-pi-nine.vercel.app` alias now 404s) (GitHub: `Lee-John-J/LEGION`;
 pushes to `master` trigger a Vercel production deploy)
 **Supabase project:** `https://kulnpqrnyjxzdegzcivf.supabase.co`
 
@@ -1137,6 +1203,13 @@ pushes to `master` trigger a Vercel production deploy)
   template leftovers removed; 20 new tests; docs re-synced
 
 **What's needed before public launch:**
+0. **The contact mailbox does not exist yet (checked 2026-09-28):**
+   `legion.report` has no MX records, so mail to `contact@legion.report` —
+   the Privacy Policy's only channel for deletion and data requests —
+   bounces. Enable Cloudflare Email Routing (LAUNCH.md B4) and send a test.
+   Also confirm Supabase Auth's Site URL / redirect URLs point at
+   `https://www.legion.report` (LAUNCH.md B5); if they still name the dead
+   vercel.app alias, confirmation and reset emails link to a 404
 1. **Manual Supabase dashboard step (still pending as of 2026-08-21):**
    enable leaked-password protection (Authentication -> Sign In / Providers
    -> Passwords). The advisor still reports it off
@@ -1166,3 +1239,5 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-08-20 | Audit remediation Phase 4 — accessibility, WCAG 2.1 AA pass (commit `9194eb2`): per-route titles + `<main>` + real heading tree; ConfirmModal dialog semantics, focus trap and restore; keyboard-reachable manage toggle (real sibling button, aria-expanded, Escape); Link Analysis nodes focusable and touch-operable, role/summary, dark text tiers, 7 -> 10 node cap; Campaign Record barcode wins-up/losses-down + tap crosshair; heatmap role=img + computed summary + visible PEAK caption; pool-bar sr-only summaries; `--muted-light` retired from text; profile badges re-tinted; redaction helpers aria-hidden + sr-only "[redacted]"; OpLog chips aria-pressed + role=group; tables th scope=col in `.table-scroll`; reduced-motion extended; 320/375 px reflow; Landing REPORT-01 and About glossary Tilt -> Campaign Record |
 | 2026-08-21 | Button-up pass (code, presentation, GitHub). Harvested four uncommitted worktrees (docs re-sync, Tilt copy purge in README + mockups, dead `.tilt-*`/matrix CSS). Server: season window falls back to last year's boundary Jan 1-9 (`services/season.js`, tested); ingest existence check chunked (PostgREST 1000-row cap) + 45 s time budget + auto-link error check; keyset pagination on `match_id`; Riot fetch 8 s timeout, bounded cache, match payloads uncached; `adjacent_cells` cross-cell disclosure removed from `/stats`; `/operations` uses `getSameTeamCellGroup` and emits `user_id`; shared `middleware/auth.js` (503 on Auth outage); UUID param guards, body-absent guards, Riot ID shape checks, cache bound; JSON 404 + error middleware, `x-powered-by` off, 16 kB body limit; `tilt_index` dropped from the payload; dead code removed; 20 new tests (32 total). Client: Briefing/OpLog remount per cell (fixes the sync-after-switch race and the new react-hooks lint); shared PageHeader / FetchFault / Redacted / ErrorBoundary / modes; `return_to` same-origin resolution (backslash bypass); 401 re-auth clears the session first; canonical Riot ID at sign-up; YOU by `user_id` everywhere; OpLog chip sort bug (`op.result`) fixed; sync banner covers every ingest status; empty-filter notice; Campaign Record gap cap; ConfirmModal error/busy states replace `alert()`; copy-to-clipboard confirmation; Supabase Auth error copy map; PASSCODE labels; ZOO glossary trimmed to the ruling; About "by Riot ID" copy fixed; contrast fixes; Link Analysis `role=group`; mock data dynamically imported behind `import.meta.env.DEV` (out of prod); vendor chunks (entry 525 -> 97 kB); fonts via `<link>`; meta description + Open Graph/Twitter cards + 1200x630 OG card + apple-touch-icon; on-brand favicon; robots.txt + sitemap.xml; Vercel asset caching + security headers; 32 dead CSS selectors removed; Vite template leftovers deleted. Repo: deps updated (0 vulnerabilities), package metadata (`legion-client` / `legion-server`, private, Node >= 20), `.nvmrc`, `.editorconfig`, GitHub Actions CI, README rewritten (OG banner, CI badge, env table, deployment notes), CLAUDE.md re-synced, GitHub topics set |
 | 2026-09-27 | Legal pass, three commits: Riot Games legal boilerplate (verbatim) + `Privacy` / `Terms` links added below the classified line in the shared footer (`0fefe4c`); public `/privacy` page, 10 plain-English provisions on the About layout (`ff22a9b`); public `/terms` page, 8 provisions (`c87ee07`). Per-route titles `PRIVACY // LEGION` / `TERMS // LEGION`. The local-storage provision was worded to match what the client actually stores rather than "only to keep you signed in". Docs: Copy Tone exception 4 (legal copy), routes table, footer spec, page features, file tree, status; `sitemap.xml` extended to the five public routes |
+| 2026-09-28 | Full copy audit (correctness, style, legal, public-site practice) and fixes. Legal: footer Riot notice switched to Riot's exact required wording (contractions + comma); competitor names removed from About and README (new Copy Tone exception 5); Privacy Policy rewritten to 14 provisions matching the code (hashed passwords, cellmate visibility, whole-season match cache incl. other players, providers incl. Google Fonts, no cookies, retention, rights, under-13s, changes); Terms rewritten to 14 (agreement, 13+, warranty disclaimer, liability cap, invite codes, cell-name rules, fictional-theme notice, changes); both effective 2026-09-28 via `lib/legal.js`; sign-up agreement line + Americas jurisdiction note on New Operator. Accuracy: Landing no longer claims solo matches are "not retained" (ingest stores them) and no longer advertises post-loss analysis; About/overlay explain Sync Intel instead of implying automatic polling; Champion Pools notes counted `top_champions` (max 5) as the unique-champion total — now `unique_champions`; analyst templates no longer assert unchecked facts ("consistent across game modes", invented per-session averages, Riot matchmaking "recalibration"); ARAM: Mayhem advisory states the API fact without attributing intent; region meta AMERICAS. Consistency: INVITE CODE everywhere (was intake/invite), `Open New File`, `JOIN CELL` submit in join mode, `ARAM: Mayhem` (Riot's name) client + server, plurals via `lib/format.js`, server errors end in periods, "contact handler" removed, raw network/HTTP errors translated in `lib/api.js`, ALL-MALE/FEMALE ROSTER -> CHAMPION POOL, you@example.com placeholders, TAGLINE label, About eyebrow ORIENTATION. Dead `legion-pi-nine.vercel.app` (404) replaced by `www.legion.report` in OG/Twitter meta, sitemap, robots, README. Mockups synced for the changed strings |
+| 2026-09-29 | Copy audit follow-ups (John's answers). Riot compliance: analyst observations and pool notes rewritten to highlight decisions instead of directing them ("Continued deployment recommended", "reassignment advisable", "co-deployment inadvisable", "continued use optimal" removed — Riot game-integrity policy on decision diversity; new Copy Tone voice rule); custom games (queue 0) excluded from stats and the Operation Log (`isCustomGame`, +1 test, 33 total); champion-gender profile tags removed end to end (data field, tag, notes, CSS, mock). Fonts self-hosted via `@fontsource` (Google Fonts links removed; Privacy provider list updated; both legal effective dates now 2026-09-29). About: five-step intake procedure written to be followed without the glossary; glossary expanded to every unexplained UI term (HANDLER, INVITE CODE, DISENGAGE, SYNC INTEL, THEATER, FIELD ASSESSMENT added; OPEN NEW FILE and others rewritten plainly); Intake option copy clarified and `?mode=join` preselect from the overlay's JOIN WITH INVITE CODE; invite banner and solo overlay say each friend opens their own file. SEO without visible change: home title without Riot marks, per-route descriptions + canonical via `RouteMeta`, WebSite JSON-LD. California governing law confirmed |

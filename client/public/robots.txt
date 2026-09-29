@@ -6,4 +6,4 @@ Disallow: /oplog
 Disallow: /intake
 Disallow: /api/
 
-Sitemap: https://legion-pi-nine.vercel.app/sitemap.xml
+Sitemap: https://www.legion.report/sitemap.xml

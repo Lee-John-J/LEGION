@@ -1,8 +1,179 @@
+import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
+import { CONTACT_EMAIL, PRIVACY_EFFECTIVE } from '../lib/legal'
 
 // Legal document: the chrome (stamp, eyebrow, headings) may carry the dossier
 // voice, but every provision body is plain English and nothing is redacted.
-const CONTACT = 'contact@legion.report'
+// The policy must describe what the code actually does — a new stored key,
+// data flow, or service provider means revising it and its effective date.
+const mail = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+
+const PROVISIONS = [
+  {
+    title: 'Information on file',
+    body: (
+      <>
+        <p>
+          <strong>Account.</strong> Your email address and a password. Sign-in
+          is handled by Supabase Auth, our authentication provider, which
+          stores passwords only in hashed form; LEGION never sees or stores
+          your password in readable form.
+        </p>
+        <p>
+          <strong>Riot account.</strong> Your Riot ID (game name and tagline)
+          and your PUUID, the permanent player identifier Riot Games assigns
+          to your account.
+        </p>
+        <p>
+          <strong>Cells.</strong> The names of cells you create or join, when
+          you joined them, and which cells you handle.
+        </p>
+        <p>
+          <strong>Match data.</strong> Public League of Legends match records
+          for your linked account, retrieved from the Riot Games API. This
+          covers your matches from the current season, including matches
+          played without your cell, although LEGION only reports matches
+          played with it. Each match record also contains the Riot IDs and
+          in-game statistics of the other players in that match, exactly as
+          Riot Games provides them.
+        </p>
+        <p>
+          <strong>Technical data.</strong> Like most websites, our hosting and
+          sign-in providers record IP addresses and basic request details in
+          their logs. LEGION also holds IP addresses briefly, in memory only, to
+          limit how often the sign-up form can check Riot IDs.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: 'Purpose of collection',
+    body: (
+      <p>
+        We use this information to run your account, link it to your Riot
+        account, compute group statistics for the cells you belong to, send
+        account emails (sign-up confirmation and passcode resets), and protect
+        the service from abuse. We do not send marketing email.
+      </p>
+    ),
+  },
+  {
+    title: 'Who can see your information',
+    body: (
+      <p>
+        Other operators in the cells you belong to can see your Riot ID and
+        the statistics LEGION computes from matches you played with them.
+        Your email address is never shown to other users. Cell pages are
+        available only to signed-in members of that cell.
+      </p>
+    ),
+  },
+  {
+    title: 'Storage and service providers',
+    body: (
+      <p>
+        Your information is stored in a database hosted by Supabase in the
+        United States. LEGION relies on these providers, each of which handles
+        data under its own privacy policy: Supabase (database and sign-in),
+        Vercel (website hosting), and the Riot Games API (source of match
+        data). Everything else the site needs, including its typefaces, is
+        served from LEGION&rsquo;s own domain.
+      </p>
+    ),
+  },
+  {
+    title: 'No selling, no advertising',
+    body: (
+      <p>
+        We do not sell or rent personal data, and we do not share it for
+        advertising. LEGION runs no ads and no analytics or tracking tools.
+      </p>
+    ),
+  },
+  {
+    title: 'Cookies and local storage',
+    body: (
+      <p>
+        LEGION does not use cookies. It uses your browser&rsquo;s local storage
+        to keep you signed in and to remember a few settings on your device,
+        such as the last cell you viewed. Clearing this site&rsquo;s data in
+        your browser removes them.
+      </p>
+    ),
+  },
+  {
+    title: 'Retention and deletion',
+    body: (
+      <p>
+        We keep your account information until you delete your account. To
+        delete it, email {mail} from the address on your account. Within 14
+        days we will delete your account, your operator record (Riot ID and
+        PUUID), and your cell memberships. Cells you created remain available
+        to their other operators. Cached match records are public game data
+        from Riot Games and may be kept after your account is deleted, but
+        they are no longer connected to a LEGION account.
+      </p>
+    ),
+  },
+  {
+    title: 'Your choices',
+    body: (
+      <p>
+        You can ask for a copy of the information LEGION holds about you, ask
+        us to correct it, or ask us to delete it by emailing {mail}. We will
+        respond within 30 days.
+      </p>
+    ),
+  },
+  {
+    title: 'Children',
+    body: (
+      <p>
+        LEGION is not directed to children under 13, and we do not knowingly
+        collect personal information from them. If you believe a child under
+        13 has created an account, contact us and we will delete it.
+      </p>
+    ),
+  },
+  {
+    title: 'Security',
+    body: (
+      <p>
+        All traffic to LEGION is encrypted in transit (HTTPS), and access to
+        the database is restricted to LEGION&rsquo;s own server. No online
+        service can guarantee perfect security.
+      </p>
+    ),
+  },
+  {
+    title: 'Affiliation',
+    body: (
+      <p>LEGION is not affiliated with or endorsed by Riot Games.</p>
+    ),
+  },
+  {
+    title: 'Changes to this policy',
+    body: (
+      <p>
+        If this policy changes, the new version will be posted here with a new
+        effective date. Changes that materially affect how your information is
+        used will also be announced on the site or by email before they take
+        effect. Use of LEGION is also governed by the{' '}
+        <Link to="/terms">Terms of Service</Link>.
+      </p>
+    ),
+  },
+  {
+    title: 'Contact',
+    body: (
+      <p>Questions about this policy or your data can be sent to {mail}.</p>
+    ),
+  },
+  {
+    title: 'Effective date',
+    body: <p>This policy is effective as of {PRIVACY_EFFECTIVE}.</p>,
+  },
+]
 
 export default function Privacy() {
   return (
@@ -30,7 +201,8 @@ export default function Privacy() {
           <h1 className="title-hero">Privacy Policy</h1>
           <p className="lead">
             This policy explains what information LEGION collects, why it is
-            collected, where it is stored, and how to have it deleted.
+            collected, who can see it, where it is stored, and how to have it
+            deleted.
           </p>
         </div>
       </section>
@@ -44,110 +216,15 @@ export default function Privacy() {
           </p>
         </div>
         <div className="intake-list">
-          <div className="intake-step">
-            <div className="intake-num">01</div>
-            <div>
-              <h3>Information on file</h3>
-              <p>
-                We collect your email address and password, which are handled
-                by Supabase Auth; your Riot ID (game name and tag line); your
-                PUUID, the permanent player identifier Riot Games assigns to
-                your account; and public League of Legends match data retrieved
-                from the Riot Games API.
-              </p>
+          {PROVISIONS.map((p, i) => (
+            <div className="intake-step" key={p.title}>
+              <div className="intake-num">{String(i + 1).padStart(2, '0')}</div>
+              <div>
+                <h3>{p.title}</h3>
+                {p.body}
+              </div>
             </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">02</div>
-            <div>
-              <h3>Purpose of collection</h3>
-              <p>
-                We use this information to identify your account, to link it to
-                your Riot account, and to compute group statistics for the cells
-                you belong to.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">03</div>
-            <div>
-              <h3>Storage</h3>
-              <p>
-                Your information is stored with Supabase, a hosted PostgreSQL
-                database service.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">04</div>
-            <div>
-              <h3>Match data</h3>
-              <p>
-                Match data is public game data provided by Riot Games. We cache
-                it to reduce the number of calls we make to the Riot Games API.
-                It is not private information.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">05</div>
-            <div>
-              <h3>Third parties</h3>
-              <p>
-                We do not sell, rent, or share personal data with third parties.
-                We run no advertising and no third-party analytics trackers.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">06</div>
-            <div>
-              <h3>Cookies and local storage</h3>
-              <p>
-                Cookies and local storage are used only to keep you signed in
-                and to remember a few settings on your device, such as the last
-                cell you viewed.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">07</div>
-            <div>
-              <h3>Deletion of records</h3>
-              <p>
-                To delete your data, email <a href={`mailto:${CONTACT}`}>{CONTACT}</a>{' '}
-                from the email address on your account. We will delete your
-                account, your operator record, and your cell memberships within
-                14 days.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">08</div>
-            <div>
-              <h3>Affiliation</h3>
-              <p>
-                LEGION is not affiliated with or endorsed by Riot Games.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">09</div>
-            <div>
-              <h3>Contact</h3>
-              <p>
-                Questions about this policy or your data can be sent to{' '}
-                <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">10</div>
-            <div>
-              <h3>Effective date</h3>
-              <p>This policy is effective as of September 26, 2026.</p>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

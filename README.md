@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/Lee-John-J/LEGION/actions/workflows/ci.yml/badge.svg)](https://github.com/Lee-John-J/LEGION/actions/workflows/ci.yml)
 
-Group stats for League of Legends. LEGION tracks how a **group of friends performs when they play together** — not individual stats (op.gg and Porofessor already do that), but the win rates, duo links, and behavioral patterns that only show up when 2+ of you are in the same game.
+Group stats for League of Legends. LEGION tracks how a **group of friends performs when they play together** — not individual stats, but the win rates, duo links, and behavioral patterns that only show up when 2+ of you are in the same game.
 
-**→ Live: [legion-pi-nine.vercel.app](https://legion-pi-nine.vercel.app)**
+**→ Live: [legion.report](https://www.legion.report)**
 
 The entire app is themed as a Cold War classified intelligence dossier — aged paper, typewriter fonts, classification stamps, redacted text blocks. Friend groups are **cells**, players are **operators**, the dashboard is a **briefing**.
 
@@ -147,3 +147,9 @@ The visual language is defined in `mockups/dossier.css` and implemented in `clie
 ## Built with
 
 This project was built collaboratively using [Claude Code](https://claude.ai/code) (Anthropic's AI development tool). The full project spec that guided development is in [`CLAUDE.md`](CLAUDE.md).
+
+## Legal
+
+LEGION isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+
+The site's [Privacy Policy](https://www.legion.report/privacy) and [Terms of Service](https://www.legion.report/terms) apply to the hosted service.

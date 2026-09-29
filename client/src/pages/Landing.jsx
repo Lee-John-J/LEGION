@@ -11,8 +11,8 @@ export default function Landing() {
         <p className="tagline-plain">
           Track how you and your friends actually perform when you play League
           of Legends <em>together</em> &mdash; combined win rates, which duos
-          click, when you&rsquo;re most active, and how your group holds up
-          after a loss.
+          click, when you&rsquo;re most active, and how your record trends
+          across the season.
         </p>
         <p className="tagline-sub">
           LEGION compiles intelligence on cells of two or more cooperating
@@ -21,7 +21,7 @@ export default function Landing() {
           baselines. Solo activity is out of scope.
         </p>
         <div className="cta-group">
-          <Link to="/authenticate" className="btn btn-primary">Open a New File</Link>
+          <Link to="/authenticate" className="btn btn-primary">Open New File</Link>
           <Link to="/authenticate" className="cta-secondary-link">
             Already on file? Authenticate &rarr;
           </Link>
@@ -84,7 +84,7 @@ export default function Landing() {
               Match history scoped to engagements with two or more operators on
               the same team. Per-match KDA, champion, and damage tabulated by
               operator. Filterable by theater, outcome, and operator. Solo
-              matches are out of scope and not retained.
+              matches are out of scope and never reported.
             </p>
           </div>
         </div>

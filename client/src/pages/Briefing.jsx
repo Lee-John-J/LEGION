@@ -4,6 +4,8 @@ import { api } from '../lib/api'
 import { isMockCell } from '../lib/devMock'
 import { STAPLE_MODES, resolveMode } from '../lib/modes'
 import { useClipboard } from '../hooks/useClipboard'
+import { plural } from '../lib/format'
+import { CONTACT_EMAIL } from '../lib/legal'
 import CellOverlay from '../components/CellOverlay'
 import CampaignRecord from '../components/CampaignRecord'
 import Footer from '../components/Footer'
@@ -189,7 +191,7 @@ function buildLinkSVG(ops, duoStats) {
   // Plain-text pair summary for screen readers (the SVG itself is role="img")
   const pairSummary = edges
     .filter((e) => !e.noData)
-    .map((e) => `${active[e.i1].name} and ${active[e.i2].name}: ${e.wr}% over ${e.games} games`)
+    .map((e) => `${active[e.i1].name} and ${active[e.i2].name}: ${e.wr}% over ${plural(e.games, 'game')}`)
     .join('; ')
 
   // ── Layout: ring on a fixed canvas — the SVG scales it to fit the panel.
@@ -444,7 +446,8 @@ function BriefingView() {
             <div className="fetch-error-title">RIOT LINK FAULT</div>
             <p className="fetch-error-note">
               {riotLinkError} New deployments cannot be filed for this operator
-              until the link is restored. Verify the Riot ID on record.
+              until the link is restored. If the Riot ID has changed, transmit
+              the new one to {CONTACT_EMAIL}.
             </p>
           </div>
         )}
@@ -466,9 +469,10 @@ function BriefingView() {
           inviteOpen ? (
             <div className="invite-banner">
               <div className="invite-banner-left">
-                <div className="invite-banner-label">CELL INTAKE CODE</div>
+                <div className="invite-banner-label">CELL INVITE CODE</div>
                 <div className="invite-banner-desc">
-                  Distribute to open files on additional operators for this cell.
+                  Share with your group. Each operator opens their own file, then
+                  enters this code on the intake page to join.
                 </div>
               </div>
               <div className="invite-banner-right">
@@ -491,7 +495,7 @@ function BriefingView() {
             </div>
           ) : (
             <button className="invite-banner-collapsed" onClick={() => setInviteOpen(true)}>
-              <span className="invite-banner-label">CELL INTAKE CODE</span>
+              <span className="invite-banner-label">CELL INVITE CODE</span>
               <span className="invite-collapsed-chevron">&#9662;</span>
             </button>
           )
@@ -688,7 +692,7 @@ function BriefingView() {
                       <div className={`mode-wr ${hasGames ? modeWrClass(m.win_rate) : 'wr-neutral'}`}>
                         {hasGames ? pct(m.win_rate) : '—'}
                       </div>
-                      <div className="mode-games">{hasGames ? `${m.games} games` : 'no data'}</div>
+                      <div className="mode-games">{hasGames ? plural(m.games, 'game') : 'no data'}</div>
                     </div>
                   )
                 })}
@@ -709,7 +713,7 @@ function BriefingView() {
                             <div className="mode-tick t-75" />
                           </div>
                           <div className={`mode-wr ${modeWrClass(m.win_rate)}`}>{pct(m.win_rate)}</div>
-                          <div className="mode-games">{m.games} games</div>
+                          <div className="mode-games">{plural(m.games, 'game')}</div>
                         </div>
                       )
                     })}
@@ -735,10 +739,9 @@ function BriefingView() {
 
           <div className="mode-advisory">
             <span className="advisory-marker">&#9632;</span>
-            ARAM: Mayhem match data is withheld from Riot API by directive.
-            Field records for this theater are not available for external analysis.
-            Matches played in this mode will not appear in LEGION reporting
-            until the restriction is lifted.
+            ARAM: Mayhem match data is not released through the Riot Games API.
+            Field records for this mode are unavailable for external analysis,
+            so matches played in it do not appear in LEGION reporting.
           </div>
         </div>
 
@@ -750,7 +753,7 @@ function BriefingView() {
           {/* Link Analysis — pair network graph */}
           <div className="card vis-panel">
             <h2 className="panel-title">Link Analysis</h2>
-            <div className="panel-subtitle">Joint win rate by operator pair. Hover an operator to isolate their links.</div>
+            <div className="panel-subtitle">Joint win rate by operator pair. Hover or tap an operator to isolate their links.</div>
             <div className="panel-body">
               <div className="link-svg-wrap">
                 {linkData ? (
@@ -940,7 +943,7 @@ function BriefingView() {
                             <div
                               key={`${di}-${hour}`}
                               className={`heatmap-cell ${heatClass(count, heatmapData.max)}`}
-                              data-tooltip={`${day} ${t}: ${count} games`}
+                              data-tooltip={`${day} ${t}: ${plural(count, 'game')}`}
                             />
                           )
                         }),
@@ -1001,6 +1004,9 @@ function BriefingView() {
                   const isYou = isCurrentUser(op)
                   const totalGames = op.games || 0
                   const allChamps = op.top_champions || []
+                  // top_champions stops at five — counts in the notes use the
+                  // true number of distinct champions on file
+                  const uniqueCount = op.unique_champions ?? allChamps.length
 
                   const activeTheaters = THEATERS.filter(t => op.theaters?.[t]?.games > 0)
                   const theaterClassifs = activeTheaters.map(t => classifyPool(op.theaters[t].top_champions, op.theaters[t].games))
@@ -1021,25 +1027,25 @@ function BriefingView() {
                   // Pick the most distinctive profile tag for the SR theater badge
                   // Rotate priority by operator so badges vary across the cell
                   const tagPriorities = [
-                    ['trait', 'gender', 'class', 'role'],
-                    ['class', 'trait', 'gender', 'role'],
-                    ['gender', 'trait', 'class', 'role'],
+                    ['trait', 'class', 'role'],
+                    ['class', 'trait', 'role'],
+                    ['role', 'trait', 'class'],
                   ]
                   const priority = tagPriorities[opSeed % tagPriorities.length]
                   const srProfileTag = priority.reduce((found, cat) => found || profileTags.find(t => t.category === cat), null)
                   const badgeCat = srProfileTag?.category
 
                   const strongTemplates = [
-                    () => `${allChamps.length} champion${allChamps.length !== 1 ? 's' : ''} on file across ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}.`,
-                    () => bestChamp ? `Primary asset: ${bestChamp.name}. ${allChamps.length} unique selections recorded.` : `${allChamps.length} selections on file.`,
-                    () => `${totalGames} joint deployments surveyed. ${allChamps.length} distinct champion selections catalogued.`,
-                    () => bestChamp ? `${bestChamp.name} leads deployment frequency. ${allChamps.length - 1} alternate${allChamps.length > 2 ? 's' : ''} on record.` : 'No dominant selection pattern identified.',
-                    () => primaryRoleLabel && roleTotal >= 3 ? `Primary lane assignment: ${primaryRoleLabel}. ${allChamps.length} champions indexed across ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}.` : `Selection data spans ${activeTheaters.length} theater${activeTheaters.length !== 1 ? 's' : ''}. ${allChamps.length} champions indexed.`,
-                    () => primaryClassLabel ? `Dominant archetype: ${primaryClassLabel.toUpperCase()}. ${allChamps.length} selections catalogued.` : `${allChamps.length} selections on file. No dominant archetype identified.`,
+                    () => `${plural(uniqueCount, 'champion')} on file across ${plural(activeTheaters.length, 'theater')}.`,
+                    () => bestChamp ? `Primary asset: ${bestChamp.name}. ${plural(uniqueCount, 'unique selection')} recorded.` : `${plural(uniqueCount, 'selection')} on file.`,
+                    () => `${totalGames} joint deployments surveyed. ${plural(uniqueCount, 'distinct champion selection')} catalogued.`,
+                    () => bestChamp ? `${bestChamp.name} leads deployment frequency. ${plural(uniqueCount - 1, 'alternate')} on record.` : 'No dominant selection pattern identified.',
+                    () => primaryRoleLabel && roleTotal >= 3 ? `Primary lane assignment: ${primaryRoleLabel}. ${plural(uniqueCount, 'champion')} indexed across ${plural(activeTheaters.length, 'theater')}.` : `Selection data spans ${plural(activeTheaters.length, 'theater')}. ${plural(uniqueCount, 'champion')} indexed.`,
+                    () => primaryClassLabel ? `Dominant archetype: ${primaryClassLabel.toUpperCase()}. ${plural(uniqueCount, 'selection')} catalogued.` : `${plural(uniqueCount, 'selection')} on file. No dominant archetype identified.`,
                   ]
 
                   const textTemplates = [
-                    () => bestWrChamp ? `Highest-WR asset: ${bestWrChamp.name} at ${Math.round(bestWrChamp.win_rate * 100)}% across ${bestWrChamp.games} deployments. ${bestChamp && bestChamp.name !== bestWrChamp.name ? `Most fielded: ${bestChamp.name} (${bestChamp.games} ops).` : 'Also the most fielded selection.'}` : 'Insufficient data for performance ranking.',
+                    () => bestWrChamp ? `Highest-WR asset: ${bestWrChamp.name} at ${Math.round(bestWrChamp.win_rate * 100)}% across ${bestWrChamp.games} deployments. ${bestChamp && bestChamp.name !== bestWrChamp.name ? `Most fielded: ${bestChamp.name} (${plural(bestChamp.games, 'op')}).` : 'Also the most fielded selection.'}` : 'Insufficient data for performance ranking.',
                     () => {
                       const labels = theaterClassifs.map(c => c.label)
                       const unique = [...new Set(labels)]
@@ -1049,13 +1055,13 @@ function BriefingView() {
                         ? `Uniform ${unique[0]} classification across all active theaters. No adaptive deviation detected.`
                         : 'Theater-level classification pending additional data.'
                     },
-                    () => bestChamp ? `${bestChamp.name} deployed ${bestChamp.games} times (${Math.round(bestChamp.win_rate * 100)}% WR). ${bestChamp.win_rate >= 0.55 ? 'Outcomes support continued prioritization.' : bestChamp.win_rate < 0.45 ? 'Outcome data for this selection is unfavorable. Review warranted.' : 'Performance within expected parameters.'}` : 'No deployment data on file.',
+                    () => bestChamp ? `${bestChamp.name} deployed ${plural(bestChamp.games, 'time')} (${Math.round(bestChamp.win_rate * 100)}% WR). ${bestChamp.win_rate >= 0.55 ? 'Outcomes for this selection exceed parity.' : bestChamp.win_rate < 0.45 ? 'Outcome data for this selection is unfavorable. Review warranted.' : 'Performance within expected parameters.'}` : 'No deployment data on file.',
                     () => {
                       const oneTricks = theaterClassifs.filter(c => c.label === 'ONE-TRICK')
                       if (oneTricks.length > 0) return `ONE-TRICK classification detected in ${oneTricks.length} theater${oneTricks.length > 1 ? 's' : ''}. Ban-phase vulnerability is assessed as ELEVATED. Pool depth: LIMITED.`
                       const chaotics = theaterClassifs.filter(c => c.label === 'CHAOTIC')
                       if (chaotics.length > 0) return `CHAOTIC classification in ${chaotics.length} theater${chaotics.length > 1 ? 's' : ''}. Per-champion mastery depth: INCONCLUSIVE. Selection methodology undetermined.`
-                      return bestWrChamp && bestWrChamp.win_rate >= 0.6 ? `${bestWrChamp.name} represents a high-value asset at ${Math.round(bestWrChamp.win_rate * 100)}% WR. Continued deployment recommended.` : 'No performance anomaly flagged. Surveillance continues.'
+                      return bestWrChamp && bestWrChamp.win_rate >= 0.6 ? `${bestWrChamp.name} represents a high-value asset at ${Math.round(bestWrChamp.win_rate * 100)}% WR. Flagged as the operator's highest-yield selection.` : 'No performance anomaly flagged. Surveillance continues.'
                     },
                     () => {
                       if (activeTheaters.length === 1) return `Operational range limited to ${activeTheaters[0]}. Cross-theater assessment: NOT POSSIBLE with current dataset.`
@@ -1066,8 +1072,6 @@ function BriefingView() {
                     () => {
                       const traitTag = badgeCat !== 'trait' && profileTags.find(t => t.category === 'trait')
                       if (traitTag) return `Behavioral pattern detected: ${traitTag.label}. Champion selection correlates with identifiable operational archetype. Monitoring classification applied.`
-                      const genderTag = badgeCat !== 'gender' && profileTags.find(t => t.category === 'gender')
-                      if (genderTag) return `Note: ${genderTag.label} across all ${totalGames} deployments. Selection bias documented.`
                       const classTag = badgeCat !== 'class' && profileTags.find(t => t.category === 'class')
                       if (classTag) return `Archetype classification: ${classTag.label}. Operational doctrine consistent across reviewed deployments.`
                       return 'No significant behavioral pattern identified. Selection methodology appears standard.'
@@ -1075,7 +1079,7 @@ function BriefingView() {
                   ]
 
                   const noteStrong = totalGames < 5
-                    ? `${totalGames} matches recorded. Sample below threshold.`
+                    ? `${plural(totalGames, 'match', 'matches')} recorded. Sample below threshold.`
                     : strongTemplates[opSeed % strongTemplates.length]()
                   const noteText = totalGames < 5
                     ? 'Profile pending additional deployments.'
@@ -1085,12 +1089,9 @@ function BriefingView() {
                   const noteProfile = (() => {
                     if (totalGames < 5) return null
                     const traitTag = badgeCat !== 'trait' && profileTags.find(t => t.category === 'trait')
-                    const genderTag = badgeCat !== 'gender' && profileTags.find(t => t.category === 'gender')
                     const classTag = badgeCat !== 'class' && profileTags.find(t => t.category === 'class')
                     const roleTag = badgeCat !== 'role' && profileTags.find(t => t.category === 'role')
-                    if (traitTag && genderTag) return `Operator profile flags: ${traitTag.label}, ${genderTag.label}. Selection pattern consistent across surveyed deployments.`
                     if (traitTag) return `Behavioral marker: ${traitTag.label}. Champion selections correlate with identifiable operational archetype.`
-                    if (genderTag) return `${genderTag.label} across all ${totalGames} surveyed deployments. Selection bias documented.`
                     if (roleTag && classTag) return `Lane doctrine: ${roleTag.label}. Archetype: ${classTag.label}. Profile classification: STABLE.`
                     if (roleTag) return `Lane assignment profile: ${roleTag.label}. Cross-role deployment data insufficient for secondary classification.`
                     if (classTag) return `Archetype classification: ${classTag.label}. Deployment consistency within expected parameters.`

@@ -58,7 +58,7 @@ export default function Header() {
   }
 
   const describeFailure = (err) =>
-    err.status === 401 ? 'CLEARANCE EXPIRED. RE-AUTHENTICATE AND RETRY.' : (err.message || 'REQUEST FAILED')
+    err.status === 401 ? 'CLEARANCE EXPIRED. RE-AUTHENTICATE AND RETRY.' : (err.message || 'REQUEST FAILED.')
 
   const handleDissolve = useCallback(async () => {
     if (!dissolveTarget || actionBusy) return
@@ -317,7 +317,7 @@ export default function Header() {
       <ConfirmModal
         label="HANDLER ACTION"
         title={`Remove ${removeTarget.name}?`}
-        description={`This will remove ${removeTarget.name} from the cell. They will lose access to all cell intelligence and operation logs. They can rejoin later with a valid intake code.`}
+        description={`This will remove ${removeTarget.name} from the cell. They will lose access to all cell intelligence and operation logs. They can rejoin later with the cell’s invite code.`}
         confirmText={removeTarget.name}
         error={actionError}
         busy={actionBusy}

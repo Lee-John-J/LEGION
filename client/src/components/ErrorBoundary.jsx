@@ -24,7 +24,7 @@ export default class ErrorBoundary extends Component {
         <div className="card fetch-error-card" role="alert">
           <div className="fetch-error-title">RETRIEVAL FAULT</div>
           <p className="fetch-error-note">
-            This page could not be rendered. This is a transmission fault
+            This page could not be rendered. This is a display fault
             &mdash; records remain intact. Reload to re-attempt.
           </p>
           <button className="fetch-error-btn" onClick={() => window.location.reload()}>

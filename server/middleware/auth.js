@@ -11,7 +11,7 @@ const { supabase } = require('../db/supabase')
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization ?? ''
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null
-  if (!token) return res.status(401).json({ error: 'AUTHENTICATION REQUIRED' })
+  if (!token) return res.status(401).json({ error: 'AUTHENTICATION REQUIRED.' })
 
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error) {
@@ -20,9 +20,9 @@ async function requireAuth(req, res, next) {
     // sign everyone out.
     const transient = error.name === 'AuthRetryableFetchError' || (error.status ?? 0) >= 500
     if (transient) return res.status(503).json({ error: 'CLEARANCE SERVICE UNAVAILABLE. RETRY SHORTLY.' })
-    return res.status(401).json({ error: 'CLEARANCE DENIED' })
+    return res.status(401).json({ error: 'CLEARANCE DENIED.' })
   }
-  if (!user) return res.status(401).json({ error: 'CLEARANCE DENIED' })
+  if (!user) return res.status(401).json({ error: 'CLEARANCE DENIED.' })
   req.user = user
   next()
 }

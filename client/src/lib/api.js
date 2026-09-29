@@ -2,6 +2,31 @@ import { supabase } from './supabase'
 
 const BASE = '/api'
 
+// Browser and platform error strings ("Failed to fetch", "Gateway Timeout")
+// never reach the UI raw — they are replaced with dossier-voice lines.
+const NETWORK_FAULT = 'TRANSMISSION FAULT. CHECK YOUR CONNECTION AND RETRY.'
+const REQUEST_FAULT = 'REQUEST FAILED. RETRY SHORTLY.'
+
+async function send(url, options) {
+  try {
+    return await fetch(url, options)
+  } catch {
+    const e = new Error(NETWORK_FAULT)
+    e.status = 0
+    throw e
+  }
+}
+
+async function failure(res) {
+  const body = await res.json().catch(() => ({}))
+  // Carry the HTTP status so callers can tell an expired session (401)
+  // apart from a server failure and route to re-authentication.
+  const e = new Error(body.error || REQUEST_FAULT)
+  e.status = res.status
+  e.code = body.code
+  return e
+}
+
 /**
  * Wrapper around fetch that:
  *  1. Reads the current Supabase session token
@@ -22,18 +47,8 @@ async function request(path, options = {}) {
     ...options.headers,
   }
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    // Carry the HTTP status so callers can tell an expired session (401)
-    // apart from a server failure and route to re-authentication.
-    const e = new Error(err.error || 'Request failed')
-    e.status = res.status
-    e.code = err.code
-    throw e
-  }
-
+  const res = await send(`${BASE}${path}`, { ...options, headers })
+  if (!res.ok) throw await failure(res)
   return res.json()
 }
 
@@ -65,18 +80,12 @@ export const api = {
 
   // Public (no auth) — validates Riot ID exists before signup
   validateRiotId: async (data) => {
-    const res = await fetch(`${BASE}/operators/validate-riot-id`, {
+    const res = await send(`${BASE}/operators/validate-riot-id`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }))
-      const e = new Error(err.error || 'Validation failed')
-      e.status = res.status
-      e.code = err.code
-      throw e
-    }
+    if (!res.ok) throw await failure(res)
     return res.json()
   },
 }

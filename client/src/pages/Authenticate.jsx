@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import Footer from '../components/Footer'
@@ -32,6 +32,8 @@ const AUTH_ERROR_COPY = [
   ['security purposes', 'REQUEST THROTTLED. STAND BY, THEN RE-SUBMIT.'],
   ['password should be', 'PASSCODE MUST BE EIGHT CHARACTERS MINIMUM.'],
   ['valid email', 'EMAIL ADDRESS MALFORMED.'],
+  ['failed to fetch', 'TRANSMISSION FAULT. CHECK YOUR CONNECTION AND RETRY.'],
+  ['network', 'TRANSMISSION FAULT. CHECK YOUR CONNECTION AND RETRY.'],
 ]
 
 function describeAuthError(err) {
@@ -178,8 +180,12 @@ export default function Authenticate() {
             </div>
           )}
 
+          {/* "ACCESS DENIED" only fits a refused sign-in; sign-up and reset
+              errors (malformed email, unknown Riot ID) carry their own line */}
           {error && (
-            <div className="auth-error" role="alert">ACCESS DENIED: {error}</div>
+            <div className="auth-error" role="alert">
+              {mode === 'signin' && !passwordRecovery ? `ACCESS DENIED: ${error}` : error}
+            </div>
           )}
 
           {passwordRecovery && (
@@ -227,7 +233,7 @@ export default function Authenticate() {
                 <input
                   id="reset-email"
                   type="email"
-                  placeholder="you@email.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -266,7 +272,7 @@ export default function Authenticate() {
                 <input
                   id="si-email"
                   type="email"
-                  placeholder="you@email.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -300,7 +306,7 @@ export default function Authenticate() {
                 <input
                   id="su-email"
                   type="email"
-                  placeholder="you@email.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -332,7 +338,7 @@ export default function Authenticate() {
                 </div>
                 <div className="riot-id-hash" aria-hidden="true">#</div>
                 <div className="field">
-                  <label htmlFor="su-riot-tag">TAG</label>
+                  <label htmlFor="su-riot-tag">TAGLINE</label>
                   <input
                     id="su-riot-tag"
                     type="text"
@@ -343,18 +349,28 @@ export default function Authenticate() {
                   />
                 </div>
               </div>
+              <p className="field-note">
+                JURISDICTION: AMERICAS SERVERS ONLY (NA, BR, LAN, LAS).
+              </p>
               <button type="submit" className="submit-btn" disabled={loading}>
                 {loading ? 'PROCESSING...' : 'OPEN OPERATOR FILE'}
               </button>
+              {/* Sign-up agreement — legal copy, plain sentence case */}
+              <p className="form-legal">
+                By opening an operator file, you confirm you are at least 13
+                years old and agree to the <Link to="/terms">Terms of Service</Link>{' '}
+                and <Link to="/privacy">Privacy Policy</Link>.
+              </p>
             </form>
           )}
 
           {!passwordRecovery && mode === 'signup' && signUpSuccess && (
-            <div className="auth-success">
+            <div className="auth-success" role="status">
               <div className="eyebrow eyebrow-green">IDENTITY LOGGED</div>
               <p>
-                Confirmation transmitted to the provided address. Verify your
-                identity to complete intake. Check your email.
+                Confirmation transmitted to the provided address. Follow the
+                link in that email to verify your identity, then authenticate
+                to complete intake.
               </p>
             </div>
           )}

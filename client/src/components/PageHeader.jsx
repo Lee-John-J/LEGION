@@ -1,4 +1,5 @@
 import { Redacted } from './Redacted'
+import { plural } from '../lib/format'
 
 // Header redactions are flush so they line up with the values they replace
 const R = (props) => <Redacted h={11} pad={false} {...props} />
@@ -15,13 +16,13 @@ function describeSync(result) {
     case 'ERROR':
       return `SYNC FAILED: ${result.message}`
     case 'INGEST_PARTIAL':
-      return `INGEST IN PROGRESS — ${fetched} new matches filed, ${result.remaining} pending. Sync again to continue.`
+      return `INGEST IN PROGRESS — ${plural(fetched, 'new match', 'new matches')} filed, ${result.remaining} pending. Sync again to continue.`
     case 'INGEST_COMPLETE':
-      return `INGEST COMPLETE — ${fetched} new matches filed, ${result.skipped ?? 0} already on record`
+      return `INGEST COMPLETE — ${plural(fetched, 'new match', 'new matches')} filed, ${result.skipped ?? 0} already on record.`
     case 'NO_LINKED_OPERATORS':
       return 'SYNC HALTED — no operator in this cell has a linked Riot ID on file.'
     case 'NO_MATCHES_FOUND':
-      return 'SYNC COMPLETE — Riot returned no matches for this cell\'s operators this season.'
+      return 'SYNC COMPLETE — Riot Games returned no matches for this cell’s operators this season.'
     default:
       return result.message ?? `SYNC STATUS: ${result.status}`
   }
@@ -47,7 +48,7 @@ export default function PageHeader({ eyebrow, hasCell, activeCell, syncing, sync
             <strong>{hasCell ? memberCount : <R w={16} />}</strong>
             {' '}operator{memberCount !== 1 ? 's' : ''}
             <span className="meta-divider">//</span>
-            region <strong>{hasCell ? 'NA' : <R w={24} />}</strong>
+            region <strong>{hasCell ? 'AMERICAS' : <R w={24} />}</strong>
             <span className="meta-divider">//</span>
             established <strong>{hasCell && activeCell.created_at
               ? new Date(activeCell.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })

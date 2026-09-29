@@ -25,7 +25,7 @@ app.get('/api/health', (_req, res) => {
 
 // Unknown routes get a JSON 404 instead of Express's HTML "Cannot GET" page.
 app.use((_req, res) => {
-  res.status(404).json({ error: 'NO SUCH FILE' })
+  res.status(404).json({ error: 'NO SUCH FILE.' })
 })
 
 // Last-resort handler. Express 5 forwards rejected async handlers here;
@@ -35,10 +35,10 @@ app.use((_req, res) => {
 // eslint-disable-next-line no-unused-vars -- Express identifies error middleware by arity
 app.use((err, _req, res, _next) => {
   if (err.status && err.status < 500) {
-    return res.status(err.status).json({ error: 'MALFORMED REQUEST' })
+    return res.status(err.status).json({ error: 'MALFORMED REQUEST.' })
   }
   console.error('[LEGION] Unhandled route error:', err)
-  res.status(500).json({ error: 'INTERNAL ERROR' })
+  res.status(500).json({ error: 'INTERNAL ERROR.' })
 })
 
 if (require.main === module) {

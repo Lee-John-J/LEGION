@@ -5,6 +5,9 @@
 
 const { analyzeProfile } = require('../data/champions')
 
+// "1 deployment" / "3 deployments" — analyst notes read as prose
+const plural = (n, word, pluralWord = `${word}s`) => `${n} ${n === 1 ? word : pluralWord}`
+
 // Resolve a human-readable mode name from queueId + gameMode fallback
 function resolveModeName(match) {
   const queueId = match.info?.queueId
@@ -16,7 +19,7 @@ function resolveModeName(match) {
     400: 'Normal',
     430: 'Normal',
     450: 'ARAM',
-    2400: 'ARAM Mayhem',
+    2400: 'ARAM: Mayhem',
     900: 'URF',
     1020: 'One for All',
     1300: 'Nexus Blitz',
@@ -45,7 +48,7 @@ const THEATER_ORDER = ["SUMMONER'S RIFT", 'HOWLING ABYSS', 'RINGS OF WRATH']
 function resolveTheater(modeName) {
   const map = {
     'ARAM': 'HOWLING ABYSS',
-    'ARAM Mayhem': 'HOWLING ABYSS',
+    'ARAM: Mayhem': 'HOWLING ABYSS',
     'Arena': 'RINGS OF WRATH',
   }
   return map[modeName] || "SUMMONER'S RIFT"
@@ -103,11 +106,22 @@ function isRemake(match) {
   return dur > 0 && dur < 300
 }
 
+/**
+ * Custom games (queue 0, which also covers tournament-code lobbies) are never
+ * reported. Riot's League policy bars displaying a player's custom-match
+ * history unless they opt in to share it specifically, so they are dropped
+ * wherever remakes are.
+ */
+function isCustomGame(match) {
+  return match.info?.queueId === 0
+}
+
 function computeCellStats(matches, cellPuuids, memberRoster = []) {
   const puuidSet = new Set(cellPuuids)
 
-  // Drop remakes before computing anything — they are voided games.
-  matches = matches.filter((m) => !isRemake(m))
+  // Drop remakes (voided games) and custom games (not reportable — see
+  // isCustomGame) before computing anything.
+  matches = matches.filter((m) => !isRemake(m) && !isCustomGame(m))
 
   // Joint match = 2+ cell members on the SAME team
   const jointMatches = matches.filter((m) => {
@@ -527,9 +541,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       if (bestDuo.games >= 3) {
         const delta = bestDuo.win_rate - overallWR
         const note = pickIdx([
-          `Joint WR: ${(bestDuo.win_rate * 100).toFixed(0)}% across ${bestDuo.games} deployments. ${(((bestDuo.win_rate - overallWR) * 100).toFixed(0))} points above cell baseline. Underlying mechanism undetermined. We assess with HIGH CONFIDENCE that separation of this pairing would degrade cell performance.`,
+          `Joint WR: ${(bestDuo.win_rate * 100).toFixed(0)}% across ${bestDuo.games} deployments. ${(((bestDuo.win_rate - overallWR) * 100).toFixed(0))} points above cell baseline. Underlying mechanism undetermined. Analyst assesses with HIGH CONFIDENCE that separating this pairing would degrade cell performance.`,
           `${bestDuo.games} joint deployments. WR: ${(bestDuo.win_rate * 100).toFixed(0)}%. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Pairing represents the cell's most reliable operational asset. Continued co-deployment is assessed as ALMOST CERTAINLY beneficial.`,
-          `${(bestDuo.win_rate * 100).toFixed(0)}% WR over ${bestDuo.games} operations — ${(((bestDuo.win_rate - overallWR) * 100).toFixed(0))} points above cell average. Pattern is consistent. Analyst assesses synergy as HIGH CONFIDENCE structural, not incidental.`,
+          `${(bestDuo.win_rate * 100).toFixed(0)}% WR over ${bestDuo.games} operations — ${(((bestDuo.win_rate - overallWR) * 100).toFixed(0))} points above cell average. Analyst assesses the synergy as LIKELY structural, not incidental.`,
         ], 0)
         candidates.push({ weight: Math.abs(delta) * 100 + bestDuo.games, obs: {
           severity: 'green', title: 'SYNERGY IDENTIFIED',
@@ -545,9 +559,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       if (worstDuo.win_rate < overallWR - 0.05) {
         const delta = overallWR - worstDuo.win_rate
         const note = pickIdx([
-          `Pair WR of ${(worstDuo.win_rate * 100).toFixed(0)}% falls ${(delta * 100).toFixed(0)} points below cell baseline. Champion overlap inconsistent. Reintroduction to joint operations has not produced improvement. Pattern is assessed as LIKELY structural.`,
-          `${(worstDuo.win_rate * 100).toFixed(0)}% joint WR across ${worstDuo.games} deployments. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Deficit is consistent across game modes. Analyst assesses compatibility concern as PROBABLE.`,
-          `Joint deployment of ${worstDuo.names[0]} and ${worstDuo.names[1]} correlates with a ${(delta * 100).toFixed(0)}-point WR decline. Sample size is sufficient for moderate confidence. Co-deployment is assessed as PROBABLY inadvisable without strategic justification.`,
+          `Pair WR of ${(worstDuo.win_rate * 100).toFixed(0)}% falls ${(delta * 100).toFixed(0)} points below cell baseline across ${worstDuo.games} deployments. Pattern is assessed as LIKELY structural.`,
+          `${(worstDuo.win_rate * 100).toFixed(0)}% joint WR across ${worstDuo.games} deployments. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Analyst assesses the compatibility concern as PROBABLE.`,
+          `Joint deployment of ${worstDuo.names[0]} and ${worstDuo.names[1]} correlates with a ${(delta * 100).toFixed(0)}-point WR decline. The pairing is flagged as the cell's least productive combination on record.`,
         ], 1)
         candidates.push({ weight: delta * 120 + worstDuo.games, obs: {
           severity: 'red', title: 'COMPATIBILITY CONCERN',
@@ -561,8 +575,8 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const bestMode = game_mode_breakdown.reduce((a, b) => a.win_rate > b.win_rate ? a : b)
       if (bestMode.games >= 3 && bestMode.win_rate > overallWR + 0.05) {
         const note = pickIdx([
-          `Cell WR in ${bestMode.mode}: ${(bestMode.win_rate * 100).toFixed(0)}% across ${bestMode.games} deployments — ${(((bestMode.win_rate - overallWR) * 100).toFixed(0))} points above cell baseline. Theater match is assessed as PROBABLY favorable. Increased allocation is warranted.`,
-          `${(bestMode.win_rate * 100).toFixed(0)}% WR in ${bestMode.mode} (${bestMode.games} operations). Performance advantage over cell baseline is consistent. Analyst assesses this theater as the cell's operational optimum with HIGH CONFIDENCE.`,
+          `Cell WR in ${bestMode.mode}: ${(bestMode.win_rate * 100).toFixed(0)}% across ${bestMode.games} deployments — ${(((bestMode.win_rate - overallWR) * 100).toFixed(0))} points above cell baseline. Theater match is assessed as PROBABLY favorable to the cell.`,
+          `${(bestMode.win_rate * 100).toFixed(0)}% WR in ${bestMode.mode} (${bestMode.games} operations), ${(((bestMode.win_rate - overallWR) * 100).toFixed(0))} points above cell baseline. Analyst assesses this theater as the cell's operational optimum with HIGH CONFIDENCE.`,
           `${bestMode.games} ${bestMode.mode} deployments. WR: ${(bestMode.win_rate * 100).toFixed(0)}%. Outperforms cell average by ${(((bestMode.win_rate - overallWR) * 100).toFixed(0))} points. Theater selection is assessed as a material variable in cell performance.`,
         ], 2)
         candidates.push({ weight: (bestMode.win_rate - overallWR) * 80 + bestMode.games * 0.5, obs: {
@@ -578,9 +592,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const worstMode = qualifiedModes.reduce((a, b) => a.win_rate < b.win_rate ? a : b)
       if (worstMode.win_rate < overallWR - 0.08) {
         const note = pickIdx([
-          `Cell WR in ${worstMode.mode}: ${(worstMode.win_rate * 100).toFixed(0)}% across ${worstMode.games} deployments. Deficit of ${(((overallWR - worstMode.win_rate) * 100).toFixed(0))} points relative to cell baseline. Performance does not improve with additional exposure. Theater reassignment is assessed as PROBABLY advisable.`,
-          `${(worstMode.win_rate * 100).toFixed(0)}% WR in ${worstMode.mode} (${worstMode.games} operations). ${(((overallWR - worstMode.win_rate) * 100).toFixed(0))}-point underperformance versus cell average. Pattern is stable and consistent. Analyst assesses continued deployment in this theater as LIKELY counterproductive.`,
-          `${worstMode.games} operations in ${worstMode.mode}. WR: ${(worstMode.win_rate * 100).toFixed(0)}%. The cell's performance floor in this theater remains well below acceptable parameters. No corrective trend observed across the sample. Tactical reallocation is assessed as PROBABLY overdue.`,
+          `Cell WR in ${worstMode.mode}: ${(worstMode.win_rate * 100).toFixed(0)}% across ${worstMode.games} deployments. Deficit of ${(((overallWR - worstMode.win_rate) * 100).toFixed(0))} points relative to cell baseline. Cause of the shortfall has not been isolated.`,
+          `${(worstMode.win_rate * 100).toFixed(0)}% WR in ${worstMode.mode} (${worstMode.games} operations). ${(((overallWR - worstMode.win_rate) * 100).toFixed(0))}-point underperformance versus cell average. Analyst flags this theater as the cell's weakest environment on record.`,
+          `${worstMode.games} operations in ${worstMode.mode}. WR: ${(worstMode.win_rate * 100).toFixed(0)}%. The cell's results in this theater remain well below its baseline. The shortfall is flagged for continued observation.`,
         ], 3)
         candidates.push({ weight: (overallWR - worstMode.win_rate) * 100 + worstMode.games * 0.5, obs: {
           severity: 'red', title: 'THEATER VULNERABILITY',
@@ -596,8 +610,8 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       if (mvp.win_rate > overallWR + 0.03) {
         const wrWithout = mvp.wr_without != null ? (mvp.wr_without * 100).toFixed(0) + '%' : 'INSUFFICIENT DATA'
         const note = pickIdx([
-          `Operator ${mvp.name} records ${(mvp.win_rate * 100).toFixed(0)}% WR across ${mvp.games} joint deployments. Cell WR in their absence: ${wrWithout}. Contribution to cell performance is assessed as HIGHLY LIKELY significant.`,
-          `${mvp.name}: ${(mvp.win_rate * 100).toFixed(0)}% joint WR. Cell WR without this operator: ${wrWithout}. Performance differential is consistent across game modes. Assessed as HIGH-VALUE operational asset with HIGH CONFIDENCE.`,
+          `Operator ${mvp.name} records ${(mvp.win_rate * 100).toFixed(0)}% WR across ${mvp.games} joint deployments. Cell WR in their absence: ${wrWithout}. Contribution to cell performance is assessed as LIKELY significant.`,
+          `${mvp.name}: ${(mvp.win_rate * 100).toFixed(0)}% joint WR. Cell WR without this operator: ${wrWithout}. Assessed as HIGH-VALUE operational asset with HIGH CONFIDENCE.`,
           `Joint WR with ${mvp.name} present: ${(mvp.win_rate * 100).toFixed(0)}%. Without: ${wrWithout}. Correlation between this operator's deployment and favorable outcomes is assessed as PROBABLY causal, not incidental.`,
         ], 4)
         candidates.push({ weight: (mvp.win_rate - overallWR) * 90 + mvp.games, obs: {
@@ -613,7 +627,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       if (anchor.win_rate < overallWR - 0.05) {
         const note = pickIdx([
           `Operator ${anchor.name} records ${(anchor.win_rate * 100).toFixed(0)}% WR across ${anchor.games} joint deployments — ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points below cell baseline. Cell WR in their absence: ${anchor.wr_without != null ? (anchor.wr_without * 100).toFixed(0) + '%' : 'INSUFFICIENT DATA'}. Performance deficit is assessed as PROBABLY structural.`,
-          `${anchor.name}: ${(anchor.win_rate * 100).toFixed(0)}% joint WR. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Deficit of ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points persists across recorded sample. No mitigating pattern identified.`,
+          `${anchor.name}: ${(anchor.win_rate * 100).toFixed(0)}% joint WR. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Deficit of ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points across the recorded sample. Cause not yet isolated.`,
           `Cell outcomes degrade measurably when ${anchor.name} is deployed. ${(anchor.win_rate * 100).toFixed(0)}% WR across ${anchor.games} operations — ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points below the cell norm. Whether the deficit stems from individual performance or compositional mismatch is UNDETERMINED.`,
         ], 5)
         candidates.push({ weight: (overallWR - anchor.win_rate) * 100 + anchor.games, obs: {
@@ -627,9 +641,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     if (tilt_index && tilt_index.score >= 5.5) {
       const maxLosses = tilt_index.judgments?.[1] ?? ''
       const note = pickIdx([
-        `Cell averages ${jointMatches.length > 5 ? Math.round(jointMatches.length / 7) : '2-3'} joint deployments per active session. Post-loss queue frequency shows no reduction after consecutive defeats. Session duration management is assessed as PROBABLY insufficient for sustained performance.`,
+        `${tilt_index.post_loss_wr != null ? `Win rate after a loss: ${(tilt_index.post_loss_wr * 100).toFixed(0)}%. ` : ''}Longest losing run: ${plural(tilt_index.max_loss_streak, 'deployment')}. Session duration management is assessed as PROBABLY insufficient for sustained performance.`,
         `${maxLosses ? maxLosses + '. ' : ''}No evidence of voluntary session termination following adverse streaks in the recorded sample. Analyst assesses session pacing discipline as UNLIKELY to be a cell priority. Operational tempo: unregulated.`,
-        `Joint deployment cadence remains constant regardless of outcome trajectory. Post-loss cooldown periods are not observed in the dataset. Session management is assessed with MODERATE CONFIDENCE as a contributing factor to performance variance.`,
+        `Session-strain indicators — post-loss results, loss streaks, and late-session decline — exceed the analyst threshold. Session management is assessed with MODERATE CONFIDENCE as a contributing factor to performance variance.`,
       ], 6)
       candidates.push({ weight: tilt_index.score * 5, obs: {
         severity: 'amber', title: 'SESSION DISCIPLINE',
@@ -646,7 +660,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
           const note = pickIdx([
             `${op.name} fields ${topChamp.name} in ${(pickRate * 100).toFixed(0)}% of recorded joint deployments. Champion pool depth is assessed as LOW. Ban-phase exposure is assessed as ALMOST CERTAINLY a recurring vulnerability.`,
             `Pick rate for ${topChamp.name} by ${op.name}: ${(pickRate * 100).toFixed(0)}% across joint operations. Operator flexibility is assessed as LIMITED. Adversarial ban pressure is LIKELY to degrade this operator's effectiveness materially.`,
-          `${topChamp.name} accounts for ${(pickRate * 100).toFixed(0)}% of ${op.name}'s joint deployment selections. Fallback options in the operator's record are sparse and underperforming. A targeted ban against this champion would ALMOST CERTAINLY force a suboptimal pivot.`,
+          `${topChamp.name} accounts for ${(pickRate * 100).toFixed(0)}% of ${op.name}'s joint deployment selections. Fallback options in the operator's record are sparse. A targeted ban against this champion would ALMOST CERTAINLY force a suboptimal pivot.`,
           ], 7)
           candidates.push({ weight: pickRate * 40, obs: {
             severity: 'amber', title: 'ONE-TRICK EXPOSURE',
@@ -759,7 +773,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const note = pickIdx([
         `Maximum consecutive wins on record: ${maxWinStreak} operations. No streak exceeding this threshold has been observed. Whether the limiting factor is performance variance or matchmaking pressure has not been determined.`,
         `${maxWinStreak}-game win streak recorded. Cell has not surpassed this operational ceiling within the current dataset. Contributing factors — opponent calibration, fatigue, or composition degradation — are assessed as PROBABLY compounding over extended sessions.`,
-        `Longest observed winning sequence: ${maxWinStreak} consecutive operations. The cell has reached but not exceeded this threshold. Analyst notes that matchmaking recalibration following sustained success is a PROBABLE contributing factor.`,
+        `Longest observed winning sequence: ${maxWinStreak} consecutive operations. The cell has reached but not exceeded this threshold. Analyst notes that stronger opposition following sustained success is a PROBABLE contributing factor.`,
       ], 8)
       candidates.push({ weight: maxWinStreak * 6, obs: {
         severity: 'blue', title: 'OPERATIONAL CEILING',
@@ -787,7 +801,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const note = pickIdx([
         `${lateNightGames.length} deployments logged in the overnight window. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `Performance falls ${(((overallWR - lateWR) * 100).toFixed(0))} points below cell baseline during this window. Degradation is assessed as PROBABLY fatigue-related.` : `Performance during this window meets or exceeds cell baseline. Contributing factors are undetermined. Surveillance continues.`}`,
         `Late-window activity: ${lateNightGames.length} joint operations in the overnight window. WR: ${(lateWR * 100).toFixed(0)}%. ${lateWR < 0.45 ? 'Outcome data for this period is unfavorable. Operational judgment during late-window sessions is assessed as PROBABLY impaired.' : 'Late-window performance is within acceptable parameters. No corrective assessment warranted at this time.'}`,
-        `${lateNightGames.length} after-hours deployments on file. WR during this window: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `A ${(((overallWR - lateWR) * 100).toFixed(0))}-point gap versus cell baseline suggests cognitive or coordination degradation. Analyst assessment: fatigue is PROBABLY a factor.` : 'Performance is stable relative to daytime operations. No evidence of impairment detected in this sample.'}`,
+        `${lateNightGames.length} after-hours deployments on file. WR during this window: ${(lateWR * 100).toFixed(0)}%. ${lateWR < overallWR ? `A ${(((overallWR - lateWR) * 100).toFixed(0))}-point gap versus cell baseline suggests fatigue or coordination loss. Analyst assessment: fatigue is PROBABLY a factor.` : 'Performance is stable relative to daytime operations. No evidence of impairment detected in this sample.'}`,
       ], 9)
       candidates.push({ weight: Math.abs(lateWR - overallWR) * 60 + lateNightGames.length, obs: {
         severity: lateWR < overallWR - 0.1 ? 'amber' : 'blue',
@@ -820,7 +834,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
         ], 10)
         candidates.push({ weight: Math.abs(weekendWR - weekdayWR) * 80, obs: {
           severity: 'blue', title: 'TEMPORAL VARIANCE',
-          subject: `${better} superiority`, note,
+          subject: better === 'weekends' ? 'Weekend advantage' : 'Weekday advantage', note,
         }})
       }
     }
@@ -830,9 +844,9 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       const topCombo = champion_synergies[0]
       if (topCombo.games >= 4) {
         const note = pickIdx([
-          `${topCombo.champions.join(' + ')} deployed ${topCombo.games} times. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. Composition recurrence suggests a default selection pattern. ${topCombo.win_rate > overallWR ? 'Outcomes support continued use. Analyst has no corrective assessment.' : 'Outcomes fall below cell baseline. Composition review is assessed as PROBABLY warranted.'}`,
-          `Recorded ${topCombo.games} instances of ${topCombo.champions.join('/')} composition. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. ${topCombo.win_rate > 0.55 ? 'Performance at this frequency is above threshold. Pattern is assessed as LOW risk.' : 'Performance at this frequency is below expectation. Composition flexibility is assessed as LIKELY a corrective lever.'}`,
-          `The ${topCombo.champions.join(' / ')} pairing has been fielded ${topCombo.games} times — the cell's most recurring composition. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. ${topCombo.win_rate > overallWR ? 'Results justify the repetition. Continued use is assessed as PROBABLY optimal.' : 'Results do not support the frequency of deployment. Composition inertia is assessed as a PROBABLE liability.'}`,
+          `${topCombo.champions.join(' + ')} deployed ${topCombo.games} times. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. Composition recurrence suggests a default selection pattern. ${topCombo.win_rate > overallWR ? 'Outcomes exceed the cell baseline. Analyst has no corrective assessment.' : 'Outcomes fall below cell baseline. Composition review is assessed as PROBABLY warranted.'}`,
+          `Recorded ${topCombo.games} instances of the ${topCombo.champions.join(' + ')} composition. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. ${topCombo.win_rate > 0.55 ? 'Performance at this frequency is above threshold. Pattern is assessed as LOW risk.' : 'Performance at this frequency is below expectation. Composition flexibility is assessed as LIKELY a corrective lever.'}`,
+          `The ${topCombo.champions.join(' + ')} combination has been fielded ${topCombo.games} times — the cell's most recurring composition. WR: ${(topCombo.win_rate * 100).toFixed(0)}%. ${topCombo.win_rate > overallWR ? 'Results exceed the cell baseline at this frequency.' : 'Results do not support the frequency of deployment. Composition inertia is assessed as a PROBABLE liability.'}`,
         ], 11)
         candidates.push({ weight: topCombo.games * 3 + Math.abs(topCombo.win_rate - overallWR) * 50, obs: {
           severity: topCombo.win_rate > overallWR ? 'green' : 'amber',
@@ -849,13 +863,13 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
     })
     if (flawless.length > 0) {
       const note = pickIdx([
-        `${flawless.length} deployment(s) on record in which all cell operators registered zero deaths and secured a victory. Execution in these instances exceeded standard performance benchmarks. Mechanism of consistency in non-flawless matches is undetermined.`,
+        `${plural(flawless.length, 'deployment')} on record in which all cell operators registered zero deaths and secured a victory. Execution in these instances exceeded standard performance benchmarks. Contributing conditions have not been isolated.`,
         `Zero-casualty wins recorded: ${flawless.length}. All cell operators survived all engagements in these operations. Whether this reflects opponent quality, cell coordination, or situational variance has not been isolated. Pattern is noted for continued observation.`,
-        `${flawless.length} operation(s) concluded with a full sweep — victory secured, zero cell casualties recorded. These represent the cell's peak operational execution. Replication conditions have not been identified with confidence.`,
+        `${plural(flawless.length, 'operation')} concluded with a full sweep — victory secured, zero cell casualties recorded. These represent the cell's peak operational execution. Replication conditions have not been identified with confidence.`,
       ], 12)
       candidates.push({ weight: flawless.length * 20 + 10, obs: {
         severity: 'green', title: 'FLAWLESS OPERATION',
-        subject: `${flawless.length} zero-death deployment(s)`, note,
+        subject: plural(flawless.length, 'zero-death deployment'), note,
       }})
     }
   }
@@ -872,7 +886,7 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       subject: 'General cell behavior',
       note: jointMatches.length < 5
         ? 'INSUFFICIENT FIELD DATA. Additional joint deployments required for pattern analysis.'
-        : 'No anomalous patterns detected in current dataset. Continued surveillance recommended.',
+        : 'No anomalous patterns detected in current dataset. Surveillance continues.',
     })
   }
 
@@ -928,4 +942,4 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
   }
 }
 
-module.exports = { computeCellStats, isRemake, getSameTeamCellGroup }
+module.exports = { computeCellStats, isRemake, isCustomGame, getSameTeamCellGroup }

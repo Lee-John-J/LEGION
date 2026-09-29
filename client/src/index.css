@@ -1007,6 +1007,24 @@ footer.site-footer {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.legal-body .intake-step p + p { margin-top: 10px; }
+.legal-body .intake-step strong { color: var(--text); }
+
+/* Sign-up agreement line under the New Operator submit button — legal copy,
+   so plain sentence case like the footer's Riot line */
+.form-legal {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+.form-legal a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* =================================================================
    AUTHENTICATE PAGE
@@ -1113,6 +1131,13 @@ footer.site-footer {
 }
 .riot-id-row .field { flex: 1; margin-bottom: 0; }
 .riot-id-row .field:last-child { flex: 0 0 120px; }
+/* Scope note under the Riot ID row (which servers LEGION can read) */
+.field-note {
+  margin: -12px 0 20px;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 1.5px; color: var(--muted);
+  line-height: 1.5;
+}
 .riot-id-hash {
   padding-bottom: 14px;
   font-family: var(--font-stat);
@@ -1995,10 +2020,9 @@ footer.site-footer {
 .badge-profile { margin-left: auto !important; }
 .badge-profile + .pool-theater-badge { margin-left: 5px; }
 /* Tint background + dark text (the white-on-mid versions measured 2.2-3.7:1);
-   gender/trait drop their off-palette cyan/violet for the neutral slate pair. */
+   trait drops its off-palette violet for the neutral slate pair. */
 .badge-profile.tag-role { background: var(--blue-bg); color: #1e3a8a; }
 .badge-profile.tag-class { background: var(--amber-bg); color: #78350f; }
-.badge-profile.tag-gender { background: var(--surface-2); color: var(--slate-4); border: 1px solid var(--border); }
 .badge-profile.tag-trait { background: var(--surface-2); color: var(--slate-4); border: 1px solid var(--border); }
 
 .sync-result {

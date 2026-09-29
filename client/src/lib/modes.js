@@ -7,7 +7,7 @@
  */
 
 // Always shown on the Game Mode Breakdown, in this order, even with 0 games
-export const STAPLE_MODES = ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'ARAM Mayhem', 'Arena']
+export const STAPLE_MODES = ['Ranked', 'Ranked Flex', 'Normal', 'ARAM', 'ARAM: Mayhem', 'Arena']
 
 const QUEUE_NAMES = {
   420: 'Ranked',
@@ -15,7 +15,7 @@ const QUEUE_NAMES = {
   400: 'Normal',
   430: 'Normal',
   450: 'ARAM',
-  2400: 'ARAM Mayhem',
+  2400: 'ARAM: Mayhem',
   900: 'URF',
   1020: 'One for All',
   1300: 'Nexus Blitz',

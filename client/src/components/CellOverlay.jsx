@@ -64,7 +64,7 @@ export default function CellOverlay() {
           <button
             className="submit-btn submit-btn-secondary"
             style={{ width: '100%' }}
-            onClick={() => navigate('/intake')}
+            onClick={() => navigate('/intake?mode=join')}
           >
             JOIN WITH INVITE CODE
           </button>
@@ -89,6 +89,7 @@ export default function CellOverlay() {
               setDismissed(true)
             }}
             title="Dismiss"
+            aria-label="Dismiss"
           >
             &times;
           </button>
@@ -99,13 +100,13 @@ export default function CellOverlay() {
           <h2 className="form-title">Append Operators to Cell</h2>
           <p className="form-subtitle">
             Cell <strong>{activeCell.name}</strong> is active with one operator
-            on file. Distribute the intake code below to open files on
+            on file. Distribute the invite code below to open files on
             additional operators. Joint surveillance begins when two or more
             cell operators deploy on the same team.
           </p>
 
           <div className="invite-overlay-code-block">
-            <div className="invite-overlay-label">CELL INTAKE CODE</div>
+            <div className="invite-overlay-label">CELL INVITE CODE</div>
             <code className="invite-overlay-code">{activeCell.invite_code}</code>
             <button
               className="invite-copy-btn invite-copy-btn-dark"
@@ -118,15 +119,15 @@ export default function CellOverlay() {
           <div className="invite-overlay-steps">
             <div className="invite-overlay-step">
               <span className="invite-step-num">01</span>
-              <span>Distribute this code to operators in your cell</span>
+              <span>Share this code with the rest of your group</span>
             </div>
             <div className="invite-overlay-step">
               <span className="invite-step-num">02</span>
-              <span>Each operator authenticates at LEGION and opens a file using this code</span>
+              <span>Each operator opens their own file at LEGION, then enters this code on the intake page</span>
             </div>
             <div className="invite-overlay-step">
               <span className="invite-step-num">03</span>
-              <span>Deploy together. Briefings are filed after the first joint deployment.</span>
+              <span>Deploy together, then run Sync Intel. Briefings are filed after the first joint deployment.</span>
             </div>
           </div>
         </div>

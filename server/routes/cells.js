@@ -4,7 +4,7 @@ const router = express.Router()
 const { supabase } = require('../db/supabase')
 const { requireAuth } = require('../middleware/auth')
 const { getAccountByRiotId, getMatchIdsPaginated, getMatch } = require('../services/riot')
-const { computeCellStats, isRemake, getSameTeamCellGroup } = require('../services/stats')
+const { computeCellStats, isRemake, isCustomGame, getSameTeamCellGroup } = require('../services/stats')
 const { currentSeasonStart, currentSeasonStartEpoch, currentSeasonYear } = require('../services/season')
 
 // ── Limits (named once so the numbers are explained once) ────────
@@ -23,7 +23,7 @@ function requireUuidParams(...names) {
   return (req, res, next) => {
     for (const name of names) {
       if (!UUID_RE.test(req.params[name] ?? '')) {
-        return res.status(400).json({ error: 'MALFORMED IDENTIFIER' })
+        return res.status(400).json({ error: 'MALFORMED IDENTIFIER.' })
       }
     }
     next()
@@ -150,7 +150,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   if (error) {
     console.error('[LEGION] DB error listing cells:', error.message)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
 
   // Get member counts in a single query instead of one per cell (N+1 fix)
@@ -195,9 +195,9 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   const sb = supabase
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
-  if (!name) return res.status(400).json({ error: 'CELL DESIGNATION REQUIRED' })
+  if (!name) return res.status(400).json({ error: 'CELL NAME IS REQUIRED.' })
   if (name.length > 64) {
-    return res.status(400).json({ error: 'CELL DESIGNATION EXCEEDS 64 CHARACTERS' })
+    return res.status(400).json({ error: 'CELL NAME EXCEEDS 64 CHARACTERS.' })
   }
 
   const invite_code = generateInviteCode()
@@ -210,7 +210,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   if (cellError) {
     console.error('[LEGION] DB error creating cell:', cellError.message)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
 
   // Auto-add creator as member — if this fails the creator can't even see
@@ -223,7 +223,7 @@ router.post('/', requireAuth, async (req, res) => {
   if (memberError) {
     console.error('[LEGION] DB error adding creator membership:', memberError.message)
     await sb.from('cells').delete().eq('id', cell.id)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
 
   res.json({ ...cell, member_count: 1 })
@@ -233,7 +233,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/:id', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
-    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
+    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL.' })
   }
   const { data: cell, error } = await sb
     .from('cells')
@@ -241,7 +241,7 @@ router.get('/:id', requireAuth, requireUuidParams('id'), async (req, res) => {
     .eq('id', req.params.id)
     .single()
 
-  if (error) return res.status(404).json({ error: 'CELL NOT FOUND' })
+  if (error) return res.status(404).json({ error: 'CELL NOT FOUND.' })
 
   const { data: memberRows } = await sb
     .from('cell_members')
@@ -266,7 +266,7 @@ router.get('/:id', requireAuth, requireUuidParams('id'), async (req, res) => {
 // Service role client bypasses RLS, so we query tables directly.
 router.post('/join-by-code', requireAuth, async (req, res) => {
   const { invite_code } = req.body ?? {}
-  if (!invite_code) return res.status(400).json({ error: 'INVITE CODE REQUIRED' })
+  if (!invite_code) return res.status(400).json({ error: 'INVITE CODE IS REQUIRED.' })
 
   // Invite codes are bearer credentials — cap guess attempts per user.
   if (!allowJoinAttempt(req.user.id)) {
@@ -277,7 +277,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
   if (!/^LGN-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
     // Same message as an unknown code so the response doesn't distinguish
     // "badly formatted" from "not found".
-    return res.status(404).json({ error: 'INVITE CODE INVALID OR EXPIRED' })
+    return res.status(404).json({ error: 'INVITE CODE INVALID OR EXPIRED.' })
   }
 
   const sb = supabase
@@ -290,7 +290,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
     .single()
 
   if (cellError || !cell) {
-    return res.status(404).json({ error: 'INVITE CODE INVALID OR EXPIRED' })
+    return res.status(404).json({ error: 'INVITE CODE INVALID OR EXPIRED.' })
   }
 
   // Check if already a member
@@ -302,7 +302,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
     .single()
 
   if (existing) {
-    return res.status(400).json({ error: 'OPERATOR ALREADY ENLISTED IN CELL' })
+    return res.status(400).json({ error: 'OPERATOR ALREADY ENLISTED IN CELL.' })
   }
 
   // Check capacity
@@ -312,7 +312,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
     .eq('cell_id', cell.id)
 
   if (count >= CELL_CAPACITY) {
-    return res.status(400).json({ error: 'CELL AT MAXIMUM CAPACITY' })
+    return res.status(400).json({ error: 'CELL AT MAXIMUM CAPACITY.' })
   }
 
   // Add member
@@ -322,7 +322,7 @@ router.post('/join-by-code', requireAuth, async (req, res) => {
 
   if (insertError) {
     console.error('[LEGION] DB error joining cell:', insertError.message)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
 
   res.json({ cell_id: cell.id, cell_name: cell.name, status: 'OPERATOR ADDED TO CELL' })
@@ -342,11 +342,11 @@ router.delete('/:id/members/:userId', requireAuth, requireUuidParams('id', 'user
     .single()
 
   if (lookupError || !cell) {
-    return res.status(404).json({ error: 'CELL NOT FOUND' })
+    return res.status(404).json({ error: 'CELL NOT FOUND.' })
   }
 
   if (cell.created_by !== req.user.id) {
-    return res.status(403).json({ error: 'ONLY THE HANDLER MAY REMOVE OPERATORS' })
+    return res.status(403).json({ error: 'ONLY THE HANDLER MAY REMOVE OPERATORS.' })
   }
 
   if (req.params.userId === req.user.id) {
@@ -361,7 +361,7 @@ router.delete('/:id/members/:userId', requireAuth, requireUuidParams('id', 'user
     .single()
 
   if (!membership) {
-    return res.status(404).json({ error: 'OPERATOR NOT FOUND IN THIS CELL' })
+    return res.status(404).json({ error: 'OPERATOR NOT FOUND IN THIS CELL.' })
   }
 
   const { error } = await sb
@@ -372,7 +372,7 @@ router.delete('/:id/members/:userId', requireAuth, requireUuidParams('id', 'user
 
   if (error) {
     console.error('[LEGION] DB error removing operator:', error.message)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
   res.json({ status: 'OPERATOR REMOVED FROM CELL' })
 })
@@ -387,11 +387,11 @@ router.delete('/:id', requireAuth, requireUuidParams('id'), async (req, res) => 
     .single()
 
   if (lookupError || !cell) {
-    return res.status(404).json({ error: 'CELL NOT FOUND' })
+    return res.status(404).json({ error: 'CELL NOT FOUND.' })
   }
 
   if (cell.created_by !== req.user.id) {
-    return res.status(403).json({ error: 'ONLY THE HANDLER MAY DISSOLVE A CELL' })
+    return res.status(403).json({ error: 'ONLY THE HANDLER MAY DISSOLVE A CELL.' })
   }
 
   await sb.from('cell_members').delete().eq('cell_id', cell.id)
@@ -399,7 +399,7 @@ router.delete('/:id', requireAuth, requireUuidParams('id'), async (req, res) => 
 
   if (error) {
     console.error('[LEGION] DB error dissolving cell:', error.message)
-    return res.status(500).json({ error: 'DATABASE ERROR' })
+    return res.status(500).json({ error: 'DATABASE ERROR.' })
   }
   res.json({ status: 'CELL DISSOLVED' })
 })
@@ -420,7 +420,7 @@ router.post('/:id/ingest', requireAuth, requireUuidParams('id'), async (req, res
   const sb = supabase
   const started = Date.now()
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
-    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
+    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL.' })
   }
 
   // Attempt to link any cell members who have no operators entry yet
@@ -563,7 +563,7 @@ router.post('/:id/ingest', requireAuth, requireUuidParams('id'), async (req, res
 router.get('/:id/stats', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
-    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
+    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL.' })
   }
   const members = await getCellPuuids(sb, req.params.id)
   const puuids = members.map((m) => m.puuid)
@@ -622,7 +622,7 @@ router.get('/:id/stats', requireAuth, requireUuidParams('id'), async (req, res) 
 router.get('/:id/operations', requireAuth, requireUuidParams('id'), async (req, res) => {
   const sb = supabase
   if (!(await requireCellMembership(sb, req.params.id, req.user.id))) {
-    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL' })
+    return res.status(403).json({ error: 'ACCESS DENIED — NOT A MEMBER OF THIS CELL.' })
   }
   const members = await getCellPuuids(sb, req.params.id)
   const puuids = members.map((m) => m.puuid)
@@ -636,9 +636,9 @@ router.get('/:id/operations', requireAuth, requireUuidParams('id'), async (req, 
   const operations = []
   for (const row of matchRows) {
     const match = row.match_data
-    // Skip remakes here too so the Operation Log (and its summary strip)
-    // agrees with the Briefing's stats engine, which also excludes them.
-    if (isRemake(match)) continue
+    // Skip remakes and custom games here too so the Operation Log (and its
+    // summary strip) agrees with the Briefing's stats engine.
+    if (isRemake(match) || isCustomGame(match)) continue
     const participants = match.info?.participants ?? []
     // Same joint-deployment rule as the stats engine (same team, or the same
     // Arena subteam), so the log and the Briefing can never disagree.

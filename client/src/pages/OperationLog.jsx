@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { isMockCell } from '../lib/devMock'
 import { resolveMode, isRotating } from '../lib/modes'
+import { plural } from '../lib/format'
 import CellOverlay from '../components/CellOverlay'
 import Footer from '../components/Footer'
 import PageHeader from '../components/PageHeader'
@@ -293,7 +294,7 @@ function OperationLogView() {
               {hasData ? (jointWR == null ? '—' : `${(jointWR * 100).toFixed(1)}%`) : <R w={100} h={36} />}
             </div>
             <div className="summary-sub">
-              {hasData ? `across ${filtered.length} matches` : <R w={90} h={10} />}
+              {hasData ? `across ${plural(filtered.length, 'match', 'matches')}` : <R w={90} h={10} />}
             </div>
           </div>
           <div className="summary-card">

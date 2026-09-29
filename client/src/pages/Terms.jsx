@@ -1,8 +1,161 @@
+import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
+import { CONTACT_EMAIL, TERMS_EFFECTIVE } from '../lib/legal'
 
 // Legal document: the chrome (stamp, eyebrow, headings) may carry the dossier
 // voice, but every provision body is plain English and nothing is redacted.
-const CONTACT = 'contact@legion.report'
+const mail = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+
+const PROVISIONS = [
+  {
+    title: 'Agreement',
+    body: (
+      <p>
+        By creating an account or using LEGION, you agree to these terms and
+        acknowledge the <Link to="/privacy">Privacy Policy</Link>. If you do
+        not agree, do not use LEGION.
+      </p>
+    ),
+  },
+  {
+    title: 'Eligibility',
+    body: (
+      <p>
+        You must be at least 13 years old to use LEGION. If you are under the
+        age of majority where you live, you must have permission from a parent
+        or guardian.
+      </p>
+    ),
+  },
+  {
+    title: 'Service provided as is',
+    body: (
+      <p>
+        LEGION is a free service run as a hobby project. It is provided
+        &ldquo;as is&rdquo; and &ldquo;as available,&rdquo; without warranties
+        of any kind, including any guarantee of accuracy, uptime, or continued
+        operation. Features may change or end at any time. LEGION depends on
+        access to the Riot Games API and may stop working if that access
+        changes.
+      </p>
+    ),
+  },
+  {
+    title: 'Your account',
+    body: (
+      <p>
+        You must be the owner of the Riot account you link to LEGION. Each
+        person may hold one LEGION account. Keep your passcode private; you are
+        responsible for activity under your account.
+      </p>
+    ),
+  },
+  {
+    title: 'Cells and invite codes',
+    body: (
+      <p>
+        Joining a cell shares your Riot ID and the statistics from matches you
+        play with its members with every other operator in that cell. Anyone
+        who has a cell&rsquo;s invite code can join it, so share codes only
+        with people you intend to add. A cell&rsquo;s handler can remove
+        operators and dissolve the cell.
+      </p>
+    ),
+  },
+  {
+    title: 'Acceptable use',
+    body: (
+      <p>
+        Do not scrape LEGION, access it by automated means, attempt to
+        circumvent its rate limits or security, interfere with its operation,
+        or impersonate another person. Cell names must not be hateful,
+        harassing, sexually explicit, or unlawful; we may rename or remove a
+        cell that breaks this rule.
+      </p>
+    ),
+  },
+  {
+    title: 'Suspension and deletion',
+    body: (
+      <p>
+        We may suspend or delete accounts or cells that violate these terms.
+        You may delete your account at any time, as described in the{' '}
+        <Link to="/privacy">Privacy Policy</Link>.
+      </p>
+    ),
+  },
+  {
+    title: 'Nature of the statistics',
+    body: (
+      <p>
+        Statistics on LEGION are derived from public Riot Games match data and
+        are provided for information and entertainment only. Analyst notes,
+        classifications, and profile badges are generated automatically from
+        templates and may be incomplete or inaccurate. No metric on LEGION is
+        a skill rating, ranking, or MMR assessment of any individual player.
+      </p>
+    ),
+  },
+  {
+    title: 'Fictional theme',
+    body: (
+      <p>
+        LEGION&rsquo;s intelligence-agency theme, including its classification
+        markings, redactions, and agency names, is fiction. LEGION is not
+        affiliated with any government or intelligence agency.
+        &ldquo;Surveillance&rdquo; on LEGION means the match statistics
+        described in the Privacy Policy and nothing more.
+      </p>
+    ),
+  },
+  {
+    title: 'Limitation of liability',
+    body: (
+      <p>
+        To the fullest extent permitted by law, LEGION and the people who run
+        it are not liable for any indirect, incidental, special, or
+        consequential damages, or for any loss of data, arising from your use
+        of LEGION. Our total liability for any claim relating to LEGION is
+        limited to US$50.
+      </p>
+    ),
+  },
+  {
+    title: 'Riot Games',
+    body: (
+      <p>
+        LEGION is not affiliated with or endorsed by Riot Games. Your use of
+        League of Legends remains subject to Riot Games&rsquo; own terms.
+      </p>
+    ),
+  },
+  {
+    title: 'Changes to these terms',
+    body: (
+      <p>
+        We may update these terms. The new version will be posted here with a
+        new effective date, and material changes will be announced on the
+        site. Continuing to use LEGION after a change takes effect means you
+        accept the updated terms.
+      </p>
+    ),
+  },
+  {
+    title: 'Governing law',
+    body: (
+      <p>These terms are governed by the laws of the State of California.</p>
+    ),
+  },
+  {
+    title: 'Contact and effective date',
+    body: (
+      <p>
+        Questions about these terms can be sent to {mail}. These terms are
+        effective as of {TERMS_EFFECTIVE}.
+      </p>
+    ),
+  },
+]
 
 export default function Terms() {
   return (
@@ -44,87 +197,15 @@ export default function Terms() {
           </p>
         </div>
         <div className="intake-list">
-          <div className="intake-step">
-            <div className="intake-num">01</div>
-            <div>
-              <h3>Service provided as is</h3>
-              <p>
-                LEGION is a free service run as a hobby project. It is provided
-                as is, with no guarantee of uptime, accuracy, or continued
-                operation.
-              </p>
+          {PROVISIONS.map((p, i) => (
+            <div className="intake-step" key={p.title}>
+              <div className="intake-num">{String(i + 1).padStart(2, '0')}</div>
+              <div>
+                <h3>{p.title}</h3>
+                {p.body}
+              </div>
             </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">02</div>
-            <div>
-              <h3>Account ownership</h3>
-              <p>
-                You must be the owner of the Riot account you link to LEGION.
-                Each person may hold one LEGION account.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">03</div>
-            <div>
-              <h3>Prohibited conduct</h3>
-              <p>
-                Do not scrape LEGION, access it by automated means, abuse the
-                service, or attempt to circumvent its rate limits.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">04</div>
-            <div>
-              <h3>Suspension and deletion</h3>
-              <p>
-                We may suspend or delete accounts that violate these terms.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">05</div>
-            <div>
-              <h3>Nature of the statistics</h3>
-              <p>
-                Statistics on LEGION are derived from public Riot Games match
-                data and are provided for information only. No metric on LEGION
-                is a skill rating, ranking, or MMR assessment of any individual
-                player.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">06</div>
-            <div>
-              <h3>Affiliation</h3>
-              <p>
-                LEGION is not affiliated with or endorsed by Riot Games.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">07</div>
-            <div>
-              <h3>Governing law</h3>
-              <p>
-                These terms are governed by the laws of the State of California.
-              </p>
-            </div>
-          </div>
-          <div className="intake-step">
-            <div className="intake-num">08</div>
-            <div>
-              <h3>Contact and effective date</h3>
-              <p>
-                Questions about these terms can be sent to{' '}
-                <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. These terms are
-                effective as of September 26, 2026.
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

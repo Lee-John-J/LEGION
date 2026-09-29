@@ -148,7 +148,6 @@ export const MOCK_STATS = {
       profile_tags: [
         { label: 'FRONTLINE DOCTRINE', category: 'class', strength: 1.0 },
         { label: 'TOP SPECIALIST', category: 'role', strength: 0.98 },
-        { label: 'ALL-MALE ROSTER', category: 'gender', strength: 1.0 },
       ],
       primary_role: 'TOP',
       primary_class: 'Fighter',
@@ -244,7 +243,6 @@ export const MOCK_STATS = {
       profile_tags: [
         { label: 'SUPPORT SPECIALIST', category: 'role', strength: 1.0 },
         { label: 'SUPPORT CORPS', category: 'class', strength: 1.0 },
-        { label: 'ALL-FEMALE ROSTER', category: 'gender', strength: 1.0 },
       ],
       primary_role: 'UTILITY',
       primary_class: 'Enchanter',
@@ -320,7 +318,7 @@ export const MOCK_STATS = {
   assessments: [
     {
       code: 'OBS-01', severity: 'green', title: 'SYNERGY IDENTIFIED',
-      subject: 'jimmmaaayyy / iHazACatz',
+      subject: 'jimmmaaayyy + iHazACatz',
       note: 'jimmmaaayyy + iHazACatz record a 57.9% WR across 38 joint deployments — 5 points above cell baseline. Jhin/Yuumi composition accounts for 8 of these with 75% WR. Pair synergy is assessed as ALMOST CERTAINLY a stabilizing factor.',
     },
     {
@@ -344,7 +342,7 @@ export const MOCK_STATS = {
     {
       code: 'OBS-06', severity: 'red', title: 'COMPATIBILITY CONCERN',
       subject: 'Pin Pon + iHazACatz',
-      note: 'Pair WR of 46% falls 7 points below cell baseline. Champion overlap inconsistent. Reintroduction to joint operations has not produced improvement. Pattern is assessed as LIKELY structural.',
+      note: 'Pair WR of 46% falls 7 points below cell baseline across 24 deployments. Pattern is assessed as LIKELY structural.',
     },
   ],
 }

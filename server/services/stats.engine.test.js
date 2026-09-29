@@ -6,7 +6,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { computeCellStats, isRemake } = require('./stats')
+const { computeCellStats, isRemake, isCustomGame } = require('./stats')
 const { participant, match } = require('./test-helpers')
 
 const HOUR = 3_600_000
@@ -136,7 +136,7 @@ test('game_mode_breakdown: queueId wins over gameMode, CHERRY falls back to Aren
     jointGame({ win: true, endTs: T0 + 3 * HOUR, queueId: 99999, gameMode: 'CHERRY' }),
   ]
   const { game_mode_breakdown } = computeCellStats(games, ['a', 'b'])
-  assert.deepEqual(game_mode_breakdown.map((m) => m.mode), ['ARAM', 'ARAM Mayhem', 'Arena'])
+  assert.deepEqual(game_mode_breakdown.map((m) => m.mode), ['ARAM', 'ARAM: Mayhem', 'Arena'])
   const aram = game_mode_breakdown.find((m) => m.mode === 'ARAM')
   assert.equal(aram.games, 2)
   assert.equal(aram.win_rate, 0.5)
@@ -190,6 +190,15 @@ test('isRemake: exactly 300 s is a real game, 0 s (missing duration) is not a re
   assert.equal(isRemake(match({ participants: [
     participant('a'), participant('x', { gameEndedInEarlySurrender: true }),
   ] })), true)
+})
+
+test('custom games (queue 0) are never reported', () => {
+  const joint = (queueId) => match({ queueId, participants: [participant('a'), participant('b')] })
+  assert.equal(isCustomGame(joint(0)), true)
+  assert.equal(isCustomGame(joint(420)), false)
+  const { total_games, games_together } = computeCellStats([joint(0), joint(420)], ['a', 'b'])
+  assert.equal(total_games, 1)
+  assert.equal(games_together, 1)
 })
 
 // ── Mixed-team matches ───────────────────────────────────────────
