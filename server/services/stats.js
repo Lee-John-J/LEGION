@@ -552,19 +552,21 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       }
     }
 
-    // ─── TYPE: INCOMPATIBILITY (worst duo) ───
+    // ─── TYPE: PAIRING UNDER REVIEW (weakest duo) ───
+    // Recorded, never attributed: no per-player blame, no directive to split
+    // the pair — the gap is noted and assessment deferred.
     const qualifiedDuos = duo_stats.filter((d) => d.games >= 3)
     if (qualifiedDuos.length > 0) {
       const worstDuo = qualifiedDuos.reduce((a, b) => a.win_rate < b.win_rate ? a : b)
       if (worstDuo.win_rate < overallWR - 0.05) {
         const delta = overallWR - worstDuo.win_rate
         const note = pickIdx([
-          `Pair WR of ${(worstDuo.win_rate * 100).toFixed(0)}% falls ${(delta * 100).toFixed(0)} points below cell baseline across ${worstDuo.games} deployments. Pattern is assessed as LIKELY structural.`,
-          `${(worstDuo.win_rate * 100).toFixed(0)}% joint WR across ${worstDuo.games} deployments. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Analyst assesses the compatibility concern as PROBABLE.`,
-          `Joint deployment of ${worstDuo.names[0]} and ${worstDuo.names[1]} correlates with a ${(delta * 100).toFixed(0)}-point WR decline. The pairing is flagged as the cell's least productive combination on record.`,
+          `Pair WR of ${(worstDuo.win_rate * 100).toFixed(0)}% sits ${(delta * 100).toFixed(0)} points under cell baseline across ${worstDuo.games} deployments. Cause is not isolated; theater mix and composition are LIKELY variables. Assessment deferred pending further joint deployments.`,
+          `${(worstDuo.win_rate * 100).toFixed(0)}% joint WR across ${worstDuo.games} deployments against a cell baseline of ${(overallWR * 100).toFixed(0)}%. The gap is noted, not attributed. Pairing remains under observation.`,
+          `Joint deployments of ${worstDuo.names[0]} and ${worstDuo.names[1]} are running ${(delta * 100).toFixed(0)} points under cell baseline. The file records the pattern without assigning cause.`,
         ], 1)
         candidates.push({ weight: delta * 120 + worstDuo.games, obs: {
-          severity: 'red', title: 'COMPATIBILITY CONCERN',
+          severity: 'amber', title: 'PAIRING UNDER REVIEW',
           subject: `${worstDuo.names[0]} + ${worstDuo.names[1]}`, note,
         }})
       }
@@ -621,18 +623,25 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       }
     }
 
-    // ─── TYPE: ANCHOR / LIABILITY (lowest WR) ───
-    if (qualified.length > 0) {
-      const anchor = qualified.reduce((a, b) => a.win_rate < b.win_rate ? a : b)
-      if (anchor.win_rate < overallWR - 0.05) {
+    // ─── TYPE: ROSTER SPREAD (cell-level) ───
+    // Deliberately names no one: the lowest-WR operator is never singled out.
+    // The spread is filed as a property of the cell, not a verdict on a player.
+    if (qualified.length >= 2) {
+      const high = Math.max(...qualified.map((o) => o.win_rate))
+      const low = Math.min(...qualified.map((o) => o.win_rate))
+      const spread = high - low
+      if (spread >= 0.10) {
+        const pts = (spread * 100).toFixed(0)
+        const hi = (high * 100).toFixed(0)
+        const lo = (low * 100).toFixed(0)
         const note = pickIdx([
-          `Operator ${anchor.name} records ${(anchor.win_rate * 100).toFixed(0)}% WR across ${anchor.games} joint deployments — ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points below cell baseline. Cell WR in their absence: ${anchor.wr_without != null ? (anchor.wr_without * 100).toFixed(0) + '%' : 'INSUFFICIENT DATA'}. Performance deficit is assessed as PROBABLY structural.`,
-          `${anchor.name}: ${(anchor.win_rate * 100).toFixed(0)}% joint WR. Cell baseline: ${(overallWR * 100).toFixed(0)}%. Deficit of ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points across the recorded sample. Cause not yet isolated.`,
-          `Cell outcomes degrade measurably when ${anchor.name} is deployed. ${(anchor.win_rate * 100).toFixed(0)}% WR across ${anchor.games} operations — ${((overallWR - anchor.win_rate) * 100).toFixed(0)} points below the cell norm. Whether the deficit stems from individual performance or compositional mismatch is UNDETERMINED.`,
+          `Operator win rates on file span ${pts} points, from ${lo}% to ${hi}%. Results inside a cell move with composition, theater, and sample size; the spread is recorded as a cell characteristic, not a verdict on any operator.`,
+          `${pts}-point spread between the roster's highest and lowest joint win rates (${hi}% / ${lo}%). The file will track whether the spread holds as the sample grows.`,
+          `Roster win rates range from ${lo}% to ${hi}% across joint deployments. No individual attribution is made: in a cell, every result is shared.`,
         ], 5)
-        candidates.push({ weight: (overallWR - anchor.win_rate) * 100 + anchor.games, obs: {
-          severity: 'red', title: 'PERFORMANCE DEFICIT',
-          subject: anchor.name, note,
+        candidates.push({ weight: spread * 60 + qualified.length, obs: {
+          severity: 'blue', title: 'ROSTER SPREAD',
+          subject: 'Operator win-rate distribution', note,
         }})
       }
     }
@@ -651,22 +660,23 @@ function computeCellStats(matches, cellPuuids, memberRoster = []) {
       }})
     }
 
-    // ─── TYPE: ONE-TRICK EXPOSURE ───
+    // ─── TYPE: SIGNATURE SELECTION (dominant champion) ───
+    // Framed as the operator's calling card, not a weakness to exploit
     for (const op of operator_stats) {
       if (op.top_champions.length > 0 && op.top_champions[0].games >= 5) {
         const topChamp = op.top_champions[0]
         const pickRate = op.games > 0 ? topChamp.games / op.games : 0
         if (pickRate >= 0.55) {
           const note = pickIdx([
-            `${op.name} fields ${topChamp.name} in ${(pickRate * 100).toFixed(0)}% of recorded joint deployments. Champion pool depth is assessed as LOW. Ban-phase exposure is assessed as ALMOST CERTAINLY a recurring vulnerability.`,
-            `Pick rate for ${topChamp.name} by ${op.name}: ${(pickRate * 100).toFixed(0)}% across joint operations. Operator flexibility is assessed as LIMITED. Adversarial ban pressure is LIKELY to degrade this operator's effectiveness materially.`,
-          `${topChamp.name} accounts for ${(pickRate * 100).toFixed(0)}% of ${op.name}'s joint deployment selections. Fallback options in the operator's record are sparse. A targeted ban against this champion would ALMOST CERTAINLY force a suboptimal pivot.`,
+            `${op.name} fields ${topChamp.name} in ${(pickRate * 100).toFixed(0)}% of recorded joint deployments. The selection is on file as the operator's signature asset.`,
+            `Pick rate for ${topChamp.name} by ${op.name}: ${(pickRate * 100).toFixed(0)}% across joint operations. Specialization depth on this selection is assessed as HIGH.`,
+            `${topChamp.name} accounts for ${(pickRate * 100).toFixed(0)}% of ${op.name}'s joint deployment selections. Opposing ban phases are LIKELY to register the pattern.`,
           ], 7)
           candidates.push({ weight: pickRate * 40, obs: {
-            severity: 'amber', title: 'ONE-TRICK EXPOSURE',
+            severity: 'blue', title: 'SIGNATURE SELECTION',
             subject: `${op.name} / ${topChamp.name}`, note,
           }})
-          break // Only one one-trick obs
+          break // Only one signature-selection obs
         }
       }
     }

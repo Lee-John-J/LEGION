@@ -203,6 +203,13 @@ Write all UI copy as if authored by a Cold War intelligence analyst.
 - Dry, clinical, authoritative — Frank IC analyst voice
 - No exclamation points. Ever.
 - Passive voice is acceptable and even preferred in places
+- No pejorative per-player labels (Riot policy; ruled 2026-09-30). A single
+  operator may be praised or described, never marked as a weakness: the
+  lowest-WR operator is never named (`ROSTER SPREAD` reports the cell's
+  spread instead), a weak pair is `PAIRING UNDER REVIEW` (noted, not
+  attributed), and pool badges describe shape (`SIGNATURE`, `FOCUSED`,
+  `ADAPTIVE`), not flaws. The Tilt Index is gone from the payload; its
+  heuristic feeds only the cell-level SESSION DISCIPLINE card
 - Numbers >= 10 use figures, numbers < 10 spell out (CIA style guide)
 - Solo activity is "out of scope" — not a limitation, a feature
 - Estimative language for assessments: `HIGH CONFIDENCE`, `MODERATE CONFIDENCE`,
@@ -721,14 +728,14 @@ top-to-bottom:
      DATA` bars and "Profile pending additional deployments."
    - Each row splits into three theater sub-bars — `SUMMONER'S RIFT`,
      `HOWLING ABYSS`, `RINGS OF WRATH` — each with `N OPS`, a class badge
-     (`SPECIALIST`, `ONE-TRICK`, `NARROW`, `ROLE-LOCKED`, `CHAOTIC`;
+     (`SPECIALIST`, `SIGNATURE`, `FOCUSED`, `ROLE-LOCKED`, `ADAPTIVE`;
      `INCONCLUSIVE` under five games in that theater) and a segmented bar of
      the top five champions by pick share (monochrome `s-1`..`s-5`, `+N more`
      remainder, tooltip `<champ> — X% pick rate // Y% WR (W-L)`, sr-only summary)
    - The Summoner's Rift header additionally carries one profile badge from
      the server's `profile_tags` when SR games >= 5 — role (`BOT SPECIALIST`,
      `MID / TOP FLEX`, `FILL AGENT`), class (`PRECISION DOCTRINE`, …), or
-     trait (`EDGELORD BIAS`, `HIGH MOBILITY BIAS`, …) — from
+     trait (`SHADOW ARCHETYPE BIAS`, `HIGH MOBILITY BIAS`, …) — from
      `server/data/champions.js`. Champion-gender tags were removed
      2026-09-29 (read as commentary on the players); do not reintroduce
    - Terse bureaucratic note: two templated sentences plus an optional
@@ -943,9 +950,9 @@ Returns:
 - **`recent_form`** — last 10 joint results `{win, timestamp, mode}`, newest first
 - **`timeline`** — `{ts, win}` per joint deployment, ascending (feeds Campaign Record)
 - **`assessments`** — the six Analyst Observations cards: 16 generator
-  archetypes (SYNERGY IDENTIFIED, COMPATIBILITY CONCERN, THEATER PREFERENCE,
-  THEATER VULNERABILITY, HIGH-VALUE OPERATOR, PERFORMANCE DEFICIT, SESSION
-  DISCIPLINE, ONE-TRICK EXPOSURE, THEATER DIVERGENCE, THEATER SPECIALIST,
+  archetypes (SYNERGY IDENTIFIED, PAIRING UNDER REVIEW, THEATER PREFERENCE,
+  THEATER VULNERABILITY, HIGH-VALUE OPERATOR, ROSTER SPREAD, SESSION
+  DISCIPLINE, SIGNATURE SELECTION, THEATER DIVERGENCE, THEATER SPECIALIST,
   CROSS-THEATER CONSISTENCY, OPERATIONAL CEILING, TEMPORAL ANOMALY, TEMPORAL
   VARIANCE, COMPOSITION LOCK, FLAWLESS OPERATION), three copy variants each,
   candidates need >= 3 joint games; top four by weight, padded with PATTERN
@@ -1246,3 +1253,4 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-09-28 | Full copy audit (correctness, style, legal, public-site practice) and fixes. Legal: footer Riot notice switched to Riot's exact required wording (contractions + comma); competitor names removed from About and README (new Copy Tone exception 5); Privacy Policy rewritten to 14 provisions matching the code (hashed passwords, cellmate visibility, whole-season match cache incl. other players, providers incl. Google Fonts, no cookies, retention, rights, under-13s, changes); Terms rewritten to 14 (agreement, 13+, warranty disclaimer, liability cap, invite codes, cell-name rules, fictional-theme notice, changes); both effective 2026-09-28 via `lib/legal.js`; sign-up agreement line + Americas jurisdiction note on New Operator. Accuracy: Landing no longer claims solo matches are "not retained" (ingest stores them) and no longer advertises post-loss analysis; About/overlay explain Sync Intel instead of implying automatic polling; Champion Pools notes counted `top_champions` (max 5) as the unique-champion total — now `unique_champions`; analyst templates no longer assert unchecked facts ("consistent across game modes", invented per-session averages, Riot matchmaking "recalibration"); ARAM: Mayhem advisory states the API fact without attributing intent; region meta AMERICAS. Consistency: INVITE CODE everywhere (was intake/invite), `Open New File`, `JOIN CELL` submit in join mode, `ARAM: Mayhem` (Riot's name) client + server, plurals via `lib/format.js`, server errors end in periods, "contact handler" removed, raw network/HTTP errors translated in `lib/api.js`, ALL-MALE/FEMALE ROSTER -> CHAMPION POOL, you@example.com placeholders, TAGLINE label, About eyebrow ORIENTATION. Dead `legion-pi-nine.vercel.app` (404) replaced by `www.legion.report` in OG/Twitter meta, sitemap, robots, README. Mockups synced for the changed strings |
 | 2026-09-29 | Copy audit follow-ups (John's answers). Riot compliance: analyst observations and pool notes rewritten to highlight decisions instead of directing them ("Continued deployment recommended", "reassignment advisable", "co-deployment inadvisable", "continued use optimal" removed — Riot game-integrity policy on decision diversity; new Copy Tone voice rule); custom games (queue 0) excluded from stats and the Operation Log (`isCustomGame`, +1 test, 33 total); champion-gender profile tags removed end to end (data field, tag, notes, CSS, mock). Fonts self-hosted via `@fontsource` (Google Fonts links removed; Privacy provider list updated; both legal effective dates now 2026-09-29). About: five-step intake procedure written to be followed without the glossary; glossary expanded to every unexplained UI term (HANDLER, INVITE CODE, DISENGAGE, SYNC INTEL, THEATER, FIELD ASSESSMENT added; OPEN NEW FILE and others rewritten plainly); Intake option copy clarified and `?mode=join` preselect from the overlay's JOIN WITH INVITE CODE; invite banner and solo overlay say each friend opens their own file. SEO without visible change: home title without Riot marks, per-route descriptions + canonical via `RouteMeta`, WebSite JSON-LD. California governing law confirmed |
 | 2026-09-29 | Removed `GET /api/operators/:puuid` and the unused `api.getOperator` client helper. No page called it, and it let any signed-in user confirm whether a given player was on LEGION and when they joined — outside the operators RLS rule and the Privacy Policy's cellmates-only wording. Docs: API table, DOSSIER terminology row, file tree; moved from Open Questions to Resolved |
+| 2026-09-30 | Per-player label pass (Riot developer-policy readiness): `PERFORMANCE DEFICIT` (named the lowest-WR operator) replaced by the cell-level `ROSTER SPREAD`; `COMPATIBILITY CONCERN` -> `PAIRING UNDER REVIEW` (amber, noted not attributed); `ONE-TRICK EXPOSURE` -> `SIGNATURE SELECTION` (blue, calling card not vulnerability); pool badges `ONE-TRICK`/`NARROW`/`CHAOTIC` -> `SIGNATURE`/`FOCUSED`/`ADAPTIVE` (no red per-player badge); `EDGELORD BIAS` -> `SHADOW ARCHETYPE BIAS`; "Review warranted" pool note neutralised. Mock fixtures, mockup, README, and docs synced; new Copy Tone rule against pejorative per-player labels |

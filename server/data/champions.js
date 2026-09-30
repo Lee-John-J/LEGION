@@ -186,7 +186,7 @@ const TRAIT_TAGS = {
   global:   { label: 'GLOBAL ULT BIAS',     threshold: 0.35 },
   yordle:   { label: 'YORDLE BIAS',         threshold: 0.40 },
   void:     { label: 'VOID CHAMP BIAS',     threshold: 0.35 },
-  edgy:     { label: 'EDGELORD BIAS',       threshold: 0.40 },
+  edgy:     { label: 'SHADOW ARCHETYPE BIAS', threshold: 0.40 },
   monster:  { label: 'NON-HUMAN BIAS',      threshold: 0.40 },
   dash:     { label: 'HIGH MOBILITY BIAS',  threshold: 0.55 },
   poke:     { label: 'LONG-RANGE BIAS',     threshold: 0.40 },
