@@ -448,7 +448,7 @@ function BriefingView() {
             <p className="fetch-error-note">
               {riotLinkError} New deployments cannot be filed for this operator
               until the link is restored. If the Riot ID has changed, transmit
-              the new one to {CONTACT_EMAIL}.
+              the new one to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
           </div>
         )}
