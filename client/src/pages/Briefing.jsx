@@ -447,7 +447,7 @@ function BriefingView() {
             <p className="fetch-error-note">
               {riotLinkError} New deployments cannot be filed for this operator
               until the link is restored. If the Riot ID has changed, transmit
-              the new one to {CONTACT_EMAIL}.
+              the new one to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
           </div>
         )}
@@ -1055,7 +1055,7 @@ function BriefingView() {
                         ? `Uniform ${unique[0]} classification across all active theaters. No adaptive deviation detected.`
                         : 'Theater-level classification pending additional data.'
                     },
-                    () => bestChamp ? `${bestChamp.name} deployed ${plural(bestChamp.games, 'time')} (${Math.round(bestChamp.win_rate * 100)}% WR). ${bestChamp.win_rate >= 0.55 ? 'Outcomes for this selection exceed parity.' : bestChamp.win_rate < 0.45 ? 'Outcome data for this selection is unfavorable. Review warranted.' : 'Performance within expected parameters.'}` : 'No deployment data on file.',
+                    () => bestChamp ? `${bestChamp.name} deployed ${plural(bestChamp.games, 'time')} (${Math.round(bestChamp.win_rate * 100)}% WR). ${bestChamp.win_rate >= 0.55 ? 'Outcomes for this selection exceed parity.' : bestChamp.win_rate < 0.45 ? 'Outcomes for this selection trail parity in the recorded sample.' : 'Performance within expected parameters.'}` : 'No deployment data on file.',
                     () => {
                       const oneTricks = theaterClassifs.filter(c => c.label === 'ONE-TRICK')
                       if (oneTricks.length > 0) return `ONE-TRICK classification detected in ${oneTricks.length} theater${oneTricks.length > 1 ? 's' : ''}. Ban-phase vulnerability is assessed as ELEVATED. Pool depth: LIMITED.`

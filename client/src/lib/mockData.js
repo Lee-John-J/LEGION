@@ -322,9 +322,9 @@ export const MOCK_STATS = {
       note: 'jimmmaaayyy + iHazACatz record a 57.9% WR across 38 joint deployments — 5 points above cell baseline. Jhin/Yuumi composition accounts for 8 of these with 75% WR. Pair synergy is assessed as ALMOST CERTAINLY a stabilizing factor.',
     },
     {
-      code: 'OBS-02', severity: 'amber', title: 'ONE-TRICK EXPOSURE',
+      code: 'OBS-02', severity: 'blue', title: 'SIGNATURE SELECTION',
       subject: 'iHazACatz / Yuumi',
-      note: 'iHazACatz fields Yuumi in 51% of recorded joint deployments. Champion pool depth is assessed as LOW. Ban-phase exposure is assessed as ALMOST CERTAINLY a recurring vulnerability.',
+      note: 'iHazACatz fields Yuumi in 51% of recorded joint deployments. The selection is on file as the operator\'s signature asset.',
     },
     {
       code: 'OBS-03', severity: 'blue', title: 'THEATER DIVERGENCE',
@@ -340,9 +340,9 @@ export const MOCK_STATS = {
       note: "90% of Pin Pon's joint deployments occur on SUMMONER'S RIFT. 45 of 50 recorded operations confined to a single theater. Cross-map versatility is assessed as UNTESTED.",
     },
     {
-      code: 'OBS-06', severity: 'red', title: 'COMPATIBILITY CONCERN',
+      code: 'OBS-06', severity: 'amber', title: 'PAIRING UNDER REVIEW',
       subject: 'Pin Pon + iHazACatz',
-      note: 'Pair WR of 46% falls 7 points below cell baseline across 24 deployments. Pattern is assessed as LIKELY structural.',
+      note: 'Pair WR of 46% sits 7 points under cell baseline across 24 deployments. Cause is not isolated; theater mix and composition are LIKELY variables. Assessment deferred pending further joint deployments.',
     },
   ],
 }
