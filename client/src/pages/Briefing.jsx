@@ -45,18 +45,17 @@ function modeWrClass(rate) {
   return 'wr-low'
 }
 
-/* ── Champion pool classification ──
-   Descriptive, never pejorative: labels name a pool's shape, not a flaw. */
+/* ── Champion pool classification ── */
 function classifyPool(topChamps, totalGames) {
   if (!topChamps || totalGames < 5) return { label: 'INCONCLUSIVE', badgeClass: 'badge-blue' }
   const top = topChamps[0]
   if (!top) return { label: 'INCONCLUSIVE', badgeClass: 'badge-blue' }
   const topPct = top.games / totalGames
-  if (topPct >= 0.70) return { label: 'SIGNATURE', badgeClass: 'badge-amber' }
+  if (topPct >= 0.70) return { label: 'ONE-TRICK', badgeClass: 'badge-red' }
   const top2Pct = (topChamps[0]?.games || 0) + (topChamps[1]?.games || 0)
   if (top2Pct / totalGames >= 0.70) return { label: 'SPECIALIST', badgeClass: 'badge-amber' }
-  if (topPct >= 0.50) return { label: 'FOCUSED', badgeClass: 'badge-amber' }
-  if (topChamps.length >= 5 && topPct < 0.30) return { label: 'ADAPTIVE', badgeClass: 'badge-blue' }
+  if (topPct >= 0.50) return { label: 'NARROW', badgeClass: 'badge-amber' }
+  if (topChamps.length >= 5 && topPct < 0.30) return { label: 'CHAOTIC', badgeClass: 'badge-blue' }
   return { label: 'ROLE-LOCKED', badgeClass: 'badge-amber' }
 }
 
@@ -1058,10 +1057,10 @@ function BriefingView() {
                     },
                     () => bestChamp ? `${bestChamp.name} deployed ${plural(bestChamp.games, 'time')} (${Math.round(bestChamp.win_rate * 100)}% WR). ${bestChamp.win_rate >= 0.55 ? 'Outcomes for this selection exceed parity.' : bestChamp.win_rate < 0.45 ? 'Outcomes for this selection trail parity in the recorded sample.' : 'Performance within expected parameters.'}` : 'No deployment data on file.',
                     () => {
-                      const signatures = theaterClassifs.filter(c => c.label === 'SIGNATURE')
-                      if (signatures.length > 0) return `SIGNATURE classification in ${signatures.length} theater${signatures.length > 1 ? 's' : ''}. Record is anchored on a single champion: the operator's calling card.`
-                      const adaptives = theaterClassifs.filter(c => c.label === 'ADAPTIVE')
-                      if (adaptives.length > 0) return `ADAPTIVE classification in ${adaptives.length} theater${adaptives.length > 1 ? 's' : ''}. No single champion dominates; selections are drawn from a wide pool.`
+                      const oneTricks = theaterClassifs.filter(c => c.label === 'ONE-TRICK')
+                      if (oneTricks.length > 0) return `ONE-TRICK classification detected in ${oneTricks.length} theater${oneTricks.length > 1 ? 's' : ''}. Ban-phase vulnerability is assessed as ELEVATED. Pool depth: LIMITED.`
+                      const chaotics = theaterClassifs.filter(c => c.label === 'CHAOTIC')
+                      if (chaotics.length > 0) return `CHAOTIC classification in ${chaotics.length} theater${chaotics.length > 1 ? 's' : ''}. Per-champion mastery depth: INCONCLUSIVE. Selection methodology undetermined.`
                       return bestWrChamp && bestWrChamp.win_rate >= 0.6 ? `${bestWrChamp.name} represents a high-value asset at ${Math.round(bestWrChamp.win_rate * 100)}% WR. Flagged as the operator's highest-yield selection.` : 'No performance anomaly flagged. Surveillance continues.'
                     },
                     () => {

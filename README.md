@@ -15,7 +15,7 @@ The entire app is themed as a Cold War classified intelligence dossier — aged 
 - **Joint win rate** across the games your group played together, with "WR without you" so each operator can see what they add
 - **Link Analysis** — a pair-by-pair network graph of which duos actually win (win rate, shared games, and a bond class per pair)
 - **Campaign Record** — a season trend of your rolling 20-game win rate, with idle "dark periods", a win/loss barcode, and streak records
-- **Champion pools** per operator, split by map (Summoner's Rift / ARAM / Arena), with playstyle classifications (SIGNATURE, SPECIALIST, ADAPTIVE, …) and profile tags
+- **Champion pools** per operator, split by map (Summoner's Rift / ARAM / Arena), with playstyle classifications (ONE-TRICK, SPECIALIST, CHAOTIC, …) and profile tags
 - **Game mode breakdown** — win rate and volume per queue
 - **Activity heatmap** — when your group is most active (7-day × 24-hour grid, in your timezone)
 - **Analyst Observations** — six intelligence-style findings generated from your data (best duo, weakest map, one-trick exposure, late-night performance, and more)

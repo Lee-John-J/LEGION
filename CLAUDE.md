@@ -207,8 +207,9 @@ Write all UI copy as if authored by a Cold War intelligence analyst.
   operator may be praised or described, never marked as a weakness: the
   lowest-WR operator is never named (`ROSTER SPREAD` reports the cell's
   spread instead), a weak pair is `PAIRING UNDER REVIEW` (noted, not
-  attributed), and pool badges describe shape (`SIGNATURE`, `FOCUSED`,
-  `ADAPTIVE`), not flaws. The Tilt Index is gone from the payload; its
+  attributed). Exception, ruled 2026-10-02: the Champion Pools badges keep
+  their community names (`ONE-TRICK`, `NARROW`, `CHAOTIC`) — they describe a
+  pool's shape in players' own vocabulary. The Tilt Index is gone from the payload; its
   heuristic feeds only the cell-level SESSION DISCIPLINE card
 - Numbers >= 10 use figures, numbers < 10 spell out (CIA style guide)
 - Solo activity is "out of scope" — not a limitation, a feature
@@ -728,7 +729,7 @@ top-to-bottom:
      DATA` bars and "Profile pending additional deployments."
    - Each row splits into three theater sub-bars — `SUMMONER'S RIFT`,
      `HOWLING ABYSS`, `RINGS OF WRATH` — each with `N OPS`, a class badge
-     (`SPECIALIST`, `SIGNATURE`, `FOCUSED`, `ROLE-LOCKED`, `ADAPTIVE`;
+     (`SPECIALIST`, `ONE-TRICK`, `NARROW`, `ROLE-LOCKED`, `CHAOTIC`;
      `INCONCLUSIVE` under five games in that theater) and a segmented bar of
      the top five champions by pick share (monochrome `s-1`..`s-5`, `+N more`
      remainder, tooltip `<champ> — X% pick rate // Y% WR (W-L)`, sr-only summary)
@@ -1254,3 +1255,4 @@ regeneration, leave-cell / handler-less cells (see Open Questions).
 | 2026-09-29 | Copy audit follow-ups (John's answers). Riot compliance: analyst observations and pool notes rewritten to highlight decisions instead of directing them ("Continued deployment recommended", "reassignment advisable", "co-deployment inadvisable", "continued use optimal" removed — Riot game-integrity policy on decision diversity; new Copy Tone voice rule); custom games (queue 0) excluded from stats and the Operation Log (`isCustomGame`, +1 test, 33 total); champion-gender profile tags removed end to end (data field, tag, notes, CSS, mock). Fonts self-hosted via `@fontsource` (Google Fonts links removed; Privacy provider list updated; both legal effective dates now 2026-09-29). About: five-step intake procedure written to be followed without the glossary; glossary expanded to every unexplained UI term (HANDLER, INVITE CODE, DISENGAGE, SYNC INTEL, THEATER, FIELD ASSESSMENT added; OPEN NEW FILE and others rewritten plainly); Intake option copy clarified and `?mode=join` preselect from the overlay's JOIN WITH INVITE CODE; invite banner and solo overlay say each friend opens their own file. SEO without visible change: home title without Riot marks, per-route descriptions + canonical via `RouteMeta`, WebSite JSON-LD. California governing law confirmed |
 | 2026-09-29 | Removed `GET /api/operators/:puuid` and the unused `api.getOperator` client helper. No page called it, and it let any signed-in user confirm whether a given player was on LEGION and when they joined — outside the operators RLS rule and the Privacy Policy's cellmates-only wording. Docs: API table, DOSSIER terminology row, file tree; moved from Open Questions to Resolved |
 | 2026-09-30 | Per-player label pass (Riot developer-policy readiness): `PERFORMANCE DEFICIT` (named the lowest-WR operator) replaced by the cell-level `ROSTER SPREAD`; `COMPATIBILITY CONCERN` -> `PAIRING UNDER REVIEW` (amber, noted not attributed); `ONE-TRICK EXPOSURE` -> `SIGNATURE SELECTION` (blue, calling card not vulnerability); pool badges `ONE-TRICK`/`NARROW`/`CHAOTIC` -> `SIGNATURE`/`FOCUSED`/`ADAPTIVE` (no red per-player badge); `EDGELORD BIAS` -> `SHADOW ARCHETYPE BIAS`; "Review warranted" pool note neutralised. Mock fixtures, mockup, README, and docs synced; new Copy Tone rule against pejorative per-player labels |
+| 2026-10-02 | Champion Pools badges reverted to `ONE-TRICK` / `NARROW` / `CHAOTIC` (and their pool notes) at John's call — community vocabulary for a pool's shape; the rest of the 2026-09-30 label pass stands (ROSTER SPREAD, PAIRING UNDER REVIEW, SIGNATURE SELECTION, SHADOW ARCHETYPE BIAS). Contact address on the Briefing `RIOT LINK FAULT` card made a mailto link (`96fcbec`) |
